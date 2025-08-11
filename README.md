@@ -2,7 +2,7 @@
 
 Host name: ubuntu-cse135
 
-root password: frogfrogFrOg
+root password: frogfrogFr0g
 
 ip address: 143.198.140.58
 

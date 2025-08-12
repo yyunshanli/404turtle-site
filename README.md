@@ -21,7 +21,7 @@ user: grader
 password frogfrog
 
 
-# site authentification 
+# site authentication 
 
 user: yunshan
 

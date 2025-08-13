@@ -49,9 +49,7 @@ After first trying the common mod_headers approach (Header always set Server "CS
 ![ssl-verify](https://github.com/user-attachments/assets/7189c057-01cc-4b4c-9f0c-2ad7ab399ba9)
 
 ## github-deploy.gif
-<img src="https://github.com/user-attachments/assets/1ed1c8e9-766a-4c4c-86b3-bd4f655c7595" width="500">
-
-note: This is the best I can do quality-wise on here. Better gif found on Gradescope.
+![Github Deploy](Github-Deploy.gif)
 
 ## php-verification.jpg
 ![php-verification](https://github.com/user-attachments/assets/87e62d32-7961-4cc8-bdb7-2bc5df355f71)

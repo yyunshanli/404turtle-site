@@ -50,6 +50,7 @@ After first trying the common mod_headers approach (Header always set Server "CS
 
 ## github-deploy.gif
 <img src="https://github.com/user-attachments/assets/1ed1c8e9-766a-4c4c-86b3-bd4f655c7595" width="500">
+
 note: This is the best I can do quality-wise on here. Better gif found on Gradescope.
 
 ## php-verification.jpg

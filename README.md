@@ -49,6 +49,8 @@ After first trying the common mod_headers approach (Header always set Server "CS
 ![ssl-verify](https://github.com/user-attachments/assets/7189c057-01cc-4b4c-9f0c-2ad7ab399ba9)
 
 ## github-deploy.gif
+<img src="https://github.com/user-attachments/assets/1ed1c8e9-766a-4c4c-86b3-bd4f655c7595" width="500">
+
 
 
 ## php-verification.jpg

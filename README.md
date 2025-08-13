@@ -18,7 +18,14 @@ password frogfrog
 https://404turtle.site/
 
 # Details of Github auto deploy setup
-Step up using git hooks
+This deployment process uses Git hooks.  
+
+1. **Create a bare repository on the server** to receive pushes from the local repository.  
+2. **Edit the `post-receive` hook** in the bare repository to automatically deploy the latest code to production by checking it out into the `/var/www` directory.  
+3. **Add the server repository as a remote** (`production`) in the local Git repository.  
+4. **Deploy by pushing to the server**:  
+   ```bash
+   git push production main
 
 # Username/password info for logging into the site
 user: grader

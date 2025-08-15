@@ -155,3 +155,36 @@ a:focus {
   text-decoration: none;
   outline: none;
 }
+
+
+/* Homework 2 four-list grid */
+.hw2 .hw2-grid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:16px;
+}
+@media (min-width:720px){
+  .hw2 .hw2-grid{ grid-template-columns:repeat(4,1fr); } /* 2×2 */
+}
+
+.hw2 .list-card{
+  background:var(--ocean-panel);
+  border:1px solid var(--reef-line);
+  border-radius:8px;
+  padding:14px 16px;
+}
+.hw2 .list-card h3{
+  margin:0 0 8px 0;
+  font-size:16px;
+  color:var(--flipper);
+  border-bottom:1px solid var(--reef-line);
+  padding-bottom:6px;
+}
+.hw2 .list-card ul{
+  list-style:disc;
+  margin:8px 0 0 18px;
+  padding:0;
+}
+.hw2 .list-card li{ margin:6px 0; }
+.hw2 .list-card a{ text-decoration:none; }
+.hw2 .list-card a:hover{ text-decoration:underline; }

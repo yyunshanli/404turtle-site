@@ -22,7 +22,7 @@ body {
   color: var(--text);
   background: radial-gradient(
       900px 600px at 10% -10%,
-      hsl(271, 69%, 29%) 0,
+      hwb(111 4% 32%) 0,
       transparent 60%
     ),
     var(--ocean-bg);

@@ -1,5 +1,8 @@
 #!/usr/bin/perl
 
+use strict;
+use warnings;
+use CGI::Carp qw(fatalsToBrowser warningsToBrowser);
 print "Content-type: text/html\n\n";
 print "Cache-Control: no-cache\n";
 print "<html>";

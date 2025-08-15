@@ -22,7 +22,7 @@ body {
   color: var(--text);
   background: radial-gradient(
       900px 600px at 10% -10%,
-      #133541 0,
+      hsl(271, 69%, 29%) 0,
       transparent 60%
     ),
     var(--ocean-bg);
@@ -83,7 +83,7 @@ h2 {
   border-radius: 6px;
   padding: 16px;
   color: var(--text);
-  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 /* Content blocks inside main */
@@ -95,7 +95,7 @@ h2 {
   padding: 20px;
   margin-bottom: 24px;
   color: #f0f7f5; /* brighter text */
-  font-family: 'Courier New', Courier, monospace;
+  font-family: "Courier New", Courier, monospace;
   box-shadow: 0 4px 10px rgba(242, 109, 31, 0.4);
 }
 
@@ -155,4 +155,3 @@ a:focus {
   text-decoration: none;
   outline: none;
 }
-

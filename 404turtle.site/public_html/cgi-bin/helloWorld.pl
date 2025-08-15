@@ -1,10 +1,7 @@
 #!/usr/bin/perl
 
-use strict;
-use warnings;
-use CGI::Carp qw(fatalsToBrowser warningsToBrowser);
-print "Content-type: text/html\n\n";
 print "Cache-Control: no-cache\n";
+print "Content-type: text/html\n\n";
 print "<html>";
 print "<head>";
 print "<title>Hello, Perl!</title>";

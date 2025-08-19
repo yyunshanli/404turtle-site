@@ -43,19 +43,6 @@ print("Content-Type: text/html; charset=utf-8")
 print(f"Set-Cookie: SID={sid}; Path=/; HttpOnly; SameSite=Lax")
 print()
 
-# HTML
-print(f"""<!doctype html>
-<html>
-<head><title>Session Test</title></head>
-<body>
-<h1>Session Test</h1>
-<hr>
-<p>CGI using Python</p>
-""", end="")
-
-if name:
-    print(f"<p><b>Name:</b> {html.escape(name)}</p>")
-
 # form 
 print(f"""
 <form method="post" action="/cgi-bin/py-sessions-1.py">

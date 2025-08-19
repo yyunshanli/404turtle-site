@@ -16,7 +16,6 @@ int main(int argc, char **argv, char **envp)
 
   // Links
   printf("<a href=\"/cgi-bin/c-sessions-1.cgi\">Back to Page 1</a>");
-  printf("<a href=\"/cgi-bin/c-sessions-1.cgi\">Back to Page 1</a>");
   printf("<br />");
   printf("<a href=\"/cgi-bin/c-sessions-2.cgi\">Back to Page 2</a>");
   printf("<br />");

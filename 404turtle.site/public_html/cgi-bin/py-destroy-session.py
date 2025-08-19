@@ -1,11 +1,25 @@
 #!/usr/bin/env python3
-print("Cache-Control: no-cache")
-# expire the cookie
-print("Set-Cookie: username=; Path=/; Max-Age=0")
-print("Content-type: text/html"); print()
+import os
 
-print("""<html>
-<head><title>Session Destroyed</title></head>
+SESS_DIR = "/tmp/py_sessions"
+def get_cookie(n):
+    c = os.environ.get("HTTP_COOKIE","")
+    for p in c.split(";"):
+        if "=" in p and p.strip().startswith(n + "="):
+            return p.split("=",1)[1].strip()
+    return ""
+
+sid = get_cookie("SID")
+if sid:
+    p = os.path.join(SESS_DIR, sid)
+    try: os.remove(p) # delete server-side id
+    except FileNotFoundError: pass
+
+print("Cache-Control: no-cache")
+print("Content-Type: text/html; charset=utf-8")
+print("Set-Cookie: SID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax")
+print()
+print("""<!doctype html><html><head><title>Session Destroyed</title></head>
 <body>
 <h1>Session Destroyed</h1>
 <p><a href="/python-cgiform.html">Back to the Python CGI Form</a></p>

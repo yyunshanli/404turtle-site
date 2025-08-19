@@ -1,34 +1,74 @@
 #!/usr/bin/env python3
-import os, sys, html
+import os, sys, html, secrets
 from urllib.parse import parse_qs
 
+SESS_DIR = "/tmp/py_sessions" # store session files
+os.makedirs(SESS_DIR, exist_ok=True)
+
+def get_cookie(name): # reads HTTP_COOKIE env var
+    c = os.environ.get("HTTP_COOKIE", "")
+    for part in c.split(";"):
+        part = part.strip()
+        if part.startswith(name + "="):
+            return part.split("=", 1)[1]
+    return ""
+
+def sess_path(sid): return os.path.join(SESS_DIR, sid)
+
+# get or create session ID
+sid = get_cookie("SID")
+if not sid or not os.path.exists(sess_path(sid)):
+    sid = secrets.token_hex(16)  # opaque session id
+
+# read POST, save to server-side session
+length = int(os.environ.get("CONTENT_LENGTH", "0") or 0)
+raw = sys.stdin.read(length) if length else os.environ.get("QUERY_STRING", "")
+name = (parse_qs(raw).get("username") or [""])[0]
+if name:
+    with open(sess_path(sid), "w") as f:
+        f.write(name)
+
+# load current value from session
+if os.path.exists(sess_path(sid)):
+    with open(sess_path(sid)) as f:
+        name = f.read()
+else:
+    name = ""
+
+# reponse
+
+# HTTP headers
 print("Cache-Control: no-cache")
-# read POST body (or accept ?username=…)
-length = int(os.environ.get("CONTENT_LENGTH","0") or 0)
-body = sys.stdin.read(length) if length else os.environ.get("QUERY_STRING","")
-params = parse_qs(body, keep_blank_values=True)
-new_name = (params.get("username") or [""])[0]
+print("Content-Type: text/html; charset=utf-8")
+print(f"Set-Cookie: SID={sid}; Path=/; HttpOnly; SameSite=Lax")
+print()
 
-# set cookie if provided
-if new_name:
-    print(f"Set-Cookie: username={new_name}; Path=/; HttpOnly")
-print("Content-type: text/html"); print()
-
-# show name: new value → cookie → default
-cookie = os.environ.get("HTTP_COOKIE","")
-name = new_name or next((p.split("=",1)[1] for p in cookie.split(";") if p.strip().startswith("username=")), "")
-
-
-print(f"""<html>
-<head><title>Python Sessions Page 1</title></head>
+# HTML
+print(f"""<!doctype html>
+<html>
+<head><title>Session Test</title></head>
 <body>
-<h1>Python Sessions Page 1</h1>
-<p><b>Name:</b> {html.escape(name)}</p>
+<h1>Session Test</h1>
+<hr>
+<p>CGI using Python</p>
+""", end="")
+
+if name:
+    print(f"<p><b>Name:</b> {html.escape(name)}</p>")
+
+# form 
+print(f"""
+<form method="post" action="/cgi-bin/py-sessions-1.py">
+  What is your name?
+  <input name="username" value="{html.escape(name)}">
+  <input type="submit" value="Test Sessioning">
+</form>
 
 <p><a href="/cgi-bin/py-sessions-2.py">Session Page 2</a></p>
-<p><a href="/python-cgiform.html">Python CGI Form</a></p>
+<p><a href="/">Home</a></p>
 
-<form action="/cgi-bin/py-destroy-session.py" method="get">
+<form method="post" action="/cgi-bin/py-destroy-session.py" style="margin-top:1rem">
   <button type="submit">Destroy Session</button>
 </form>
-</body></html>""")
+</body></html>
+""")

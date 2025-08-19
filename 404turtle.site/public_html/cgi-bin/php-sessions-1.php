@@ -17,7 +17,7 @@ $name = $_SESSION['username'] ?? '';
 <p><b>Name:</b> <?= $name !== '' ? htmlspecialchars($name) : 'You do not have a name set' ?></p>
 
 <p><a href="/cgi-bin/php-sessions-2.php">Session Page 2</a></p>
-<p><a href="/php-cgiform.html">PHP CGI Form</a></p>
+<p><a href="/php-state-demo.html">PHP CGI Form</a></p>
 
 <form style="margin-top:30px" action="/cgi-bin/php-destroy-session.php" method="get">
   <button type="submit">Destroy Session</button>

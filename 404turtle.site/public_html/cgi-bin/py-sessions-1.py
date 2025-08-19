@@ -44,19 +44,15 @@ print(f"Set-Cookie: SID={sid}; Path=/; HttpOnly; SameSite=Lax")
 print()
 
 # form 
-print(f"""
-<form method="post" action="/cgi-bin/py-sessions-1.py">
-  What is your name?
-  <input name="username" value="{html.escape(name)}">
-  <input type="submit" value="Test Sessioning">
-</form>
+print(f"""<!doctype html><html><head><title>Python Sessions Page 2</title></head>
+<body>
+<h1>Python Sessions Page 1</h1>
+<p><b>Name:</b> {html.escape(name)}</p>
 
-<p><a href="/cgi-bin/py-sessions-2.py">Session Page 2</a></p>
+<p><a href="/cgi-bin/py-sessions-2.py">Session Page 1</a></p>
 <p><a href="/python-state-demo.html">Python CGI Form</a></p>
-<p><a href="/">Home</a></p>
 
-<form method="post" action="/cgi-bin/py-destroy-session.py" style="margin-top:1rem">
+<form method="post" action="/cgi-bin/py-destroy-session.py">
   <button type="submit">Destroy Session</button>
 </form>
-</body></html>
-""")
+</body></html>""")

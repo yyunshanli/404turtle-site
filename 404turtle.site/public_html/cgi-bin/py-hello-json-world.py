@@ -2,7 +2,7 @@
 import os, json, datetime
 print("Content-Type: application/json\r\n\r\n")
 out = {
-  "title":"Hello, Python!", "heading":"Hello, Python!",
+  "title":"Hello, Python!", "heading":"404Turtle was here - Hello, Python!",
   "message":"This page was generated with Python (CGI).",
   "time": datetime.datetime.now().isoformat(sep=" ", timespec="seconds"),
   "IP": os.environ.get("REMOTE_ADDR","unknown")

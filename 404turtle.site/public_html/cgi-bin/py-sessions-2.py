@@ -24,7 +24,7 @@ print(f"""<!doctype html><html><head><title>Python Sessions Page 2</title></head
 <p><b>Name:</b> {html.escape(name)}</p>
 
 <p><a href="/cgi-bin/py-sessions-1.py">Session Page 1</a></p>
-<p><a href="/python-cgiform.html">Python CGI Form</a></p>
+<p><a href="/python-state-demo.html">Python CGI Form</a></p>
 
 <form method="post" action="/cgi-bin/py-destroy-session.py">
   <button type="submit">Destroy Session</button>

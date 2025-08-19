@@ -65,6 +65,7 @@ print(f"""
 </form>
 
 <p><a href="/cgi-bin/py-sessions-2.py">Session Page 2</a></p>
+<p><a href="/python-state-demo.html">Python CGI Form</a></p>
 <p><a href="/">Home</a></p>
 
 <form method="post" action="/cgi-bin/py-destroy-session.py" style="margin-top:1rem">

@@ -1,4 +1,3 @@
-#!/usr/bin/php-cgi
 <?php
 // Ensure we target the SAME cookie (Path=/)
 session_set_cookie_params(['path' => '/']);

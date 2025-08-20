@@ -1,4 +1,3 @@
-#!/usr/bin/php-cgi
 <?php
 // Make the PHPSESSID cookie live at the site root
 session_set_cookie_params(['path' => '/']);

@@ -1,4 +1,3 @@
-#!/usr/bin/php-cgi
 <?php
 session_set_cookie_params(['path' => '/']);
 session_start();
@@ -14,7 +13,7 @@ $name = $_SESSION['username'] ?? '';
 <head><title>PHP Sessions Page 2</title></head>
 <body>
 <h1>PHP Sessions Page 2</h1>
-<p><b>Name:</b> <?= $name !== '' ? htmlspecialchars($name) : 'NAME' ?></p>
+<p><b>Name:</b> <?= $name !== '' ? htmlspecialchars($name) : 'You do not have a name set' ?></p>
 
 <p><a href="/cgi-bin/php-sessions-1.php">Session Page 1</a></p>
 <p><a href="/php-state-demo.html">PHP CGI Form</a></p>

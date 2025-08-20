@@ -1,8 +1,12 @@
-
+#!/usr/bin/php-cgi
 <?php
+session_set_cookie_params(['path' => '/']);
 session_start();
-header('Cache-Control: no-cache');
-header('Content-type: text/html');
+
+header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Pragma: no-cache');
+header('Content-Type: text/html; charset=utf-8');
+
 $name = $_SESSION['username'] ?? '';
 ?>
 <!DOCTYPE html>

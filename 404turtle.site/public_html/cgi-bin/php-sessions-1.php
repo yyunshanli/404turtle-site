@@ -1,12 +1,18 @@
-
+#!/usr/bin/php-cgi
 <?php
+// Make the PHPSESSID cookie live at the site root
+session_set_cookie_params(['path' => '/']);
 session_start();
-header('Cache-Control: no-cache');
-header('Content-type: text/html');
 
-if (isset($_POST['username']) && $_POST['username'] !== '') {
+header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Pragma: no-cache');
+header('Content-Type: text/html; charset=utf-8');
+
+// Save name if posted
+if (!empty($_POST['username'])) {
   $_SESSION['username'] = $_POST['username'];
 }
+
 $name = $_SESSION['username'] ?? '';
 ?>
 <!DOCTYPE html>

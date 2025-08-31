@@ -1,11 +1,11 @@
-// collector.js
+// ===== collector.js (STATIC + PERFORMANCE • single POST, example-shaped payload) =====
 
 // stable session id
 function genId() { return Math.random().toString(36).slice(2) + Date.now(); }
 const SID_KEY = "collector_sid";
 let sessionId = localStorage.getItem(SID_KEY) || (localStorage.setItem(SID_KEY, genId()), localStorage.getItem(SID_KEY));
 
-// tiny sender 
+// tiny sender
 async function postJSON(path, payload) {
   console.log("POST", path, payload);
   try {
@@ -18,7 +18,7 @@ async function postJSON(path, payload) {
   } catch {}
 }
 
-// detect helpers
+// detectors
 function detectImagesEnabled() {
   return new Promise((resolve) => {
     const img = new Image();
@@ -26,7 +26,7 @@ function detectImagesEnabled() {
     img.onload  = () => { if (!done) { done = true; resolve(true); } };
     img.onerror = () => { if (!done) { done = true; resolve(false); } };
     img.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
-    setTimeout(() => { if (!done) resolve(true); }, 300); // fallback
+    setTimeout(() => { if (!done) resolve(true); }, 300);
   });
 }
 function detectCssEnabled() {
@@ -42,39 +42,67 @@ function detectCssEnabled() {
   } catch { return null; }
 }
 
-// build static block (sync)
+// static (sync)
 function getStaticSync() {
   return {
-    sessionId,
-    timestamp: Date.now(),
-    pageUrl: location.href,
-    path: location.pathname,
-    referrer: document.referrer || "",
-    userAgent: navigator.userAgent || "",
-    language: navigator.language || "",
+    ua: navigator.userAgent || "",
+    lang: navigator.language || "",
     cookiesEnabled: navigator.cookieEnabled ?? null,
     jsEnabled: true,
     screen: { w: screen?.width ?? null, h: screen?.height ?? null },
     viewport: { w: window.innerWidth, h: window.innerHeight },
-    networkType: navigator.connection?.effectiveType || null
+    network: navigator.connection?.effectiveType || null
   };
 }
 
-// init: wait for DOM so CSS detection works reliably
-async function init() {
-  // sync info first
-  const base = getStaticSync();
-  // async detections
-  const [imagesEnabled, cssEnabled] = await Promise.all([
-    detectImagesEnabled(),
-    Promise.resolve(detectCssEnabled())
-  ]);
+// performance (after load), shaped like your example
+function getPerformanceBlock() {
+  let performanceBlock = {};
+  const nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
 
-  // single combined POST
-  await postJSON("/json/events", { ...base, imagesEnabled, cssEnabled });
-
-  console.log("collector (static) sessionId:", sessionId);
+  if (nav && nav.toJSON) {
+    const j = nav.toJSON();
+    const start = j.startTime || 0;
+    let end = j.loadEventEnd || j.domComplete || j.responseEnd || j.duration || 0;
+    if (!end || end <= start) end = performance.now();
+    performanceBlock = { raw: j, start, end, totalMs: Math.max(0, end - start) };
+  } else if (performance.timing) {
+    const t = performance.timing;
+    const start = t.navigationStart || 0;
+    let end = t.loadEventEnd || t.domComplete || t.responseEnd || 0;
+    if (!end || end <= start) end = Date.now();
+    performanceBlock = { raw: t, start, end, totalMs: Math.max(0, end - start) };
+  }
+  return performanceBlock;
 }
 
-if (document.readyState === "complete" || document.readyState === "interactive") init();
-else window.addEventListener("DOMContentLoaded", init);
+// init — send one combined payload after full load
+function boot() {
+  const onLoad = async () => {
+    const staticBase = getStaticSync();
+    const [imagesEnabled, cssEnabled] = await Promise.all([
+      detectImagesEnabled(),
+      Promise.resolve(detectCssEnabled())
+    ]);
+    const performanceBlock = getPerformanceBlock();
+
+    const payload = {
+      type: "pageview",
+      ts: Date.now(),
+      sessionId,
+      url: location.href,
+      path: location.pathname,
+      referrer: document.referrer || null,
+      static: { ...staticBase, imagesEnabled, cssEnabled },
+      performance: performanceBlock
+    };
+
+    await postJSON("/events", payload);
+    console.log("collector (static + perf) sessionId:", sessionId);
+  };
+
+  if (document.readyState === "complete") onLoad();
+  else window.addEventListener("load", onLoad, { once: true });
+}
+
+boot();

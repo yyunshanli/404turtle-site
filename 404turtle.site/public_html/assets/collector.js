@@ -1,11 +1,11 @@
-// ===== collector.js (STATIC + PERFORMANCE • single POST) =====
+// ===== collector.js (STATIC + MINIMAL PERFORMANCE • single POST) =====
 
 // stable session id
 function genId() { return Math.random().toString(36).slice(2) + Date.now(); }
 const SID_KEY = "collector_sid";
 let sessionId = localStorage.getItem(SID_KEY) || (localStorage.setItem(SID_KEY, genId()), localStorage.getItem(SID_KEY));
 
-// tiny sender (logs so you can verify)
+// tiny sender
 async function postJSON(path, payload) {
   console.log("POST", path, payload);
   try {
@@ -18,12 +18,12 @@ async function postJSON(path, payload) {
   } catch {}
 }
 
-// detect helpers
+// detectors
 function detectImagesEnabled() {
   return new Promise((resolve) => {
     const img = new Image();
     let done = false;
-    img.onload = () => { if (!done) { done = true; resolve(true); } };
+    img.onload  = () => { if (!done) { done = true; resolve(true); } };
     img.onerror = () => { if (!done) { done = true; resolve(false); } };
     img.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
     setTimeout(() => { if (!done) resolve(true); }, 300);
@@ -42,7 +42,7 @@ function detectCssEnabled() {
   } catch { return null; }
 }
 
-// static (sync snapshot)
+// static snapshot (sync)
 function getStaticSync() {
   return {
     sessionId,
@@ -60,28 +60,27 @@ function getStaticSync() {
   };
 }
 
-// performance (after full load)
+// minimal performance block (after load)
 function getPerformanceBlock() {
   try {
     const nav = performance.getEntriesByType?.("navigation")?.[0];
     if (nav?.toJSON) {
-      const raw = nav.toJSON();
-      const startRel = raw.startTime || 0; // relative to timeOrigin
+      const raw = nav.toJSON(); // whole timing object
+      const startRel = raw.startTime || 0;
       let endRel = raw.loadEventEnd || raw.domComplete || raw.responseEnd || raw.duration || 0;
       if (!endRel || endRel <= startRel) endRel = performance.now();
-      const start = Math.round(performance.timeOrigin + startRel); // absolute ms since epoch
+      const start = Math.round(performance.timeOrigin + startRel); // ms since epoch
       const end   = Math.round(performance.timeOrigin + endRel);
-      const totalMs = Math.max(0, endRel - startRel);
+      const totalMs = Math.max(0, Math.round(endRel - startRel));
       return { raw, start, end, totalMs };
     }
-    // legacy Navigation Timing
-    const t = performance.timing;
-    if (t) {
+    // legacy
+    if (performance.timing) {
+      const t = performance.timing;
       const start = t.navigationStart || 0;
       let end = t.loadEventEnd || t.domComplete || t.responseEnd || 0;
       if (!end || end <= start) end = Date.now();
       const totalMs = Math.max(0, end - start);
-      // clone minimal raw timing to avoid circular refs
       const raw = {
         navigationStart: t.navigationStart,
         loadEventEnd: t.loadEventEnd,
@@ -94,26 +93,20 @@ function getPerformanceBlock() {
   return {};
 }
 
-// init — wait for full load so perf timings are final
+// init — wait for full load so timings are final
 function boot() {
   const onLoad = async () => {
-    // gather everything once
     const base = getStaticSync();
     const [imagesEnabled, cssEnabled] = await Promise.all([
       detectImagesEnabled(),
       Promise.resolve(detectCssEnabled())
     ]);
-    const performanceBlock = getPerformanceBlock();
+    const performance = getPerformanceBlock();
 
-    // single combined POST (static + performance)
-    await postJSON("/json/events", {
-      ...base,
-      imagesEnabled,
-      cssEnabled,
-      performance: performanceBlock
-    });
+    // single combined POST
+    await postJSON("/json/events", { ...base, imagesEnabled, cssEnabled, performance });
 
-    console.log("collector (static + perf) sessionId:", sessionId);
+    console.log("collector sessionId:", sessionId);
   };
 
   if (document.readyState === "complete") onLoad();

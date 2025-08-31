@@ -74,21 +74,6 @@ function getPerformanceBlock() {
       const totalMs = Math.max(0, Math.round(endRel - startRel));
       return { raw, start, end, totalMs };
     }
-    // legacy
-    if (performance.timing) {
-      const t = performance.timing;
-      const start = t.navigationStart || 0;
-      let end = t.loadEventEnd || t.domComplete || t.responseEnd || 0;
-      if (!end || end <= start) end = Date.now();
-      const totalMs = Math.max(0, end - start);
-      const raw = {
-        navigationStart: t.navigationStart,
-        loadEventEnd: t.loadEventEnd,
-        domComplete: t.domComplete,
-        responseEnd: t.responseEnd
-      };
-      return { raw, start, end, totalMs };
-    }
   } catch {}
   return {};
 }

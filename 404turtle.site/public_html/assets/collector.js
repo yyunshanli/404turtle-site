@@ -1,12 +1,13 @@
-//collector.js
+//ollector.js (STATIC ONLY → /json/events)
 
-// session id 
+// session id (stable across pageviews)
 function genId() { return Math.random().toString(36).slice(2) + Date.now(); }
 const SID_KEY = "collector_sid";
 let sessionId = localStorage.getItem(SID_KEY) || (localStorage.setItem(SID_KEY, genId()), localStorage.getItem(SID_KEY));
 
 // tiny sender
 async function postJSON(path, payload) {
+  console.log("Sending payload to", path, payload); // <-- debug log
   try {
     const res = await fetch(path, {
       method: "POST",
@@ -20,7 +21,7 @@ async function postJSON(path, payload) {
   }
 }
 
-// simple detectors
+// detectors
 function detectImagesEnabled() {
   return new Promise((resolve) => {
     const img = new Image();
@@ -44,7 +45,7 @@ function detectCssEnabled() {
   } catch { return null; }
 }
 
-// build static block
+// base static block
 function getStaticSync() {
   return {
     sessionId,
@@ -62,18 +63,20 @@ function getStaticSync() {
   };
 }
 
+// init
 async function init() {
   // send sync static first
   const base = getStaticSync();
-  await postJSON("/sessions", base);
+  await postJSON("/json/events", base);
 
-  // add async bits (images/css) right after
+  // add async bits (images/css)
   const imagesEnabled = await detectImagesEnabled();
   const cssEnabled = detectCssEnabled();
-  await postJSON("/sessions", { ...getStaticSync(), imagesEnabled, cssEnabled });
+  await postJSON("/json/events", { ...getStaticSync(), imagesEnabled, cssEnabled });
 
-  console.log("collector (static) sessionId:", sessionId);
+  console.log("collector (static only) sessionId:", sessionId);
 }
 
+// boot
 if (document.readyState === "complete" || document.readyState === "interactive") init();
 else window.addEventListener("DOMContentLoaded", init);

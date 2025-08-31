@@ -1,35 +1,32 @@
-//ollector.js (STATIC ONLY → /json/events)
+// collector.js
 
-// session id (stable across pageviews)
+// stable session id
 function genId() { return Math.random().toString(36).slice(2) + Date.now(); }
 const SID_KEY = "collector_sid";
 let sessionId = localStorage.getItem(SID_KEY) || (localStorage.setItem(SID_KEY, genId()), localStorage.getItem(SID_KEY));
 
-// tiny sender
+// tiny sender 
 async function postJSON(path, payload) {
-  console.log("Sending payload to", path, payload); // <-- debug log
+  console.log("POST", path, payload);
   try {
-    const res = await fetch(path, {
+    await fetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
       keepalive: true
     });
-    return { ok: res.ok, status: res.status };
-  } catch (e) {
-    return { ok: false, status: 0 };
-  }
+  } catch {}
 }
 
-// detectors
+// detect helpers
 function detectImagesEnabled() {
   return new Promise((resolve) => {
     const img = new Image();
     let done = false;
-    img.onload = () => { if (!done) { done = true; resolve(true); } };
+    img.onload  = () => { if (!done) { done = true; resolve(true); } };
     img.onerror = () => { if (!done) { done = true; resolve(false); } };
     img.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
-    setTimeout(() => { if (!done) resolve(true); }, 300);
+    setTimeout(() => { if (!done) resolve(true); }, 300); // fallback
   });
 }
 function detectCssEnabled() {
@@ -45,7 +42,7 @@ function detectCssEnabled() {
   } catch { return null; }
 }
 
-// base static block
+// build static block (sync)
 function getStaticSync() {
   return {
     sessionId,
@@ -63,20 +60,21 @@ function getStaticSync() {
   };
 }
 
-// init
+// init: wait for DOM so CSS detection works reliably
 async function init() {
-  // send sync static first
+  // sync info first
   const base = getStaticSync();
-  await postJSON("/json/events", base);
+  // async detections
+  const [imagesEnabled, cssEnabled] = await Promise.all([
+    detectImagesEnabled(),
+    Promise.resolve(detectCssEnabled())
+  ]);
 
-  // add async bits (images/css)
-  const imagesEnabled = await detectImagesEnabled();
-  const cssEnabled = detectCssEnabled();
-  await postJSON("/json/events", { ...getStaticSync(), imagesEnabled, cssEnabled });
+  // single combined POST
+  await postJSON("/events", { ...base, imagesEnabled, cssEnabled });
 
-  console.log("collector (static only) sessionId:", sessionId);
+  console.log("collector (static) sessionId:", sessionId);
 }
 
-// boot
 if (document.readyState === "complete" || document.readyState === "interactive") init();
 else window.addEventListener("DOMContentLoaded", init);

@@ -97,7 +97,7 @@ function boot() {
       performance: performanceBlock
     };
 
-    await postJSON("/events", payload);
+    await postJSON("/json/events", payload);
     console.log("collector (static + perf) sessionId:", sessionId);
   };
 

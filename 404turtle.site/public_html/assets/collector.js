@@ -71,7 +71,7 @@ async function init() {
   ]);
 
   // single combined POST
-  await postJSON("/events", { ...base, imagesEnabled, cssEnabled });
+  await postJSON("/json/events", { ...base, imagesEnabled, cssEnabled });
 
   console.log("collector (static) sessionId:", sessionId);
 }

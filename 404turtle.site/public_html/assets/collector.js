@@ -1,4 +1,4 @@
-// ===== collector.js (STATIC + MINIMAL PERFORMANCE • single POST) =====
+// ===== collector.js (STATIC + PERFORMANCE + ACTIVITY) =====
 
 // stable session id
 function genId() { return Math.random().toString(36).slice(2) + Date.now(); }
@@ -18,7 +18,7 @@ async function postJSON(path, payload) {
   } catch {}
 }
 
-// detectors
+// -------- helpers --------
 function detectImagesEnabled() {
   return new Promise((resolve) => {
     const img = new Image();
@@ -41,15 +41,27 @@ function detectCssEnabled() {
     return w === 10;
   } catch { return null; }
 }
-
-// static snapshot (sync)
-function getStaticSync() {
+function throttle(fn, ms) {
+  let last = 0;
+  return (...args) => {
+    const now = Date.now();
+    if (now - last >= ms) { last = now; fn(...args); }
+  };
+}
+function base(extra = {}) {
   return {
     sessionId,
     timestamp: Date.now(),
     pageUrl: location.href,
     path: location.pathname,
     referrer: document.referrer || "",
+    ...extra
+  };
+}
+
+// -------- static snapshot (sync) --------
+function getStaticSync() {
+  return {
     userAgent: navigator.userAgent || "",
     language: navigator.language || "",
     cookiesEnabled: navigator.cookieEnabled ?? null,
@@ -60,12 +72,12 @@ function getStaticSync() {
   };
 }
 
-// minimal performance block (after load)
+// -------- minimal performance block (after load) --------
 function getPerformanceBlock() {
   try {
     const nav = performance.getEntriesByType?.("navigation")?.[0];
     if (nav?.toJSON) {
-      const raw = nav.toJSON(); // whole timing object
+      const raw = nav.toJSON();
       const startRel = raw.startTime || 0;
       let endRel = raw.loadEventEnd || raw.domComplete || raw.responseEnd || raw.duration || 0;
       if (!endRel || endRel <= startRel) endRel = performance.now();
@@ -78,18 +90,103 @@ function getPerformanceBlock() {
   return {};
 }
 
-// init — wait for full load so timings are final
+// -------- ACTIVITY --------
+function sendEvent(type, extra) {
+  postJSON("/json/events", base({ type, ...extra }));
+}
+
+// idle ≥ 2s
+const IDLE_MS = 2000;
+let lastActivity = Date.now();
+let idleStart = null;
+function markActivity() {
+  const now = Date.now();
+  if (idleStart && now - idleStart >= IDLE_MS) {
+    sendEvent("idle", { endedAt: now, durationMs: now - idleStart });
+  }
+  idleStart = null;
+  lastActivity = now;
+}
+setInterval(() => {
+  if (!idleStart && Date.now() - lastActivity >= IDLE_MS) {
+    idleStart = lastActivity + IDLE_MS;
+  }
+}, 500);
+
+// errors
+window.addEventListener("error", (e) => {
+  sendEvent("error", {
+    error: {
+      message: e.message || "",
+      source: e.filename || "",
+      lineno: e.lineno || null,
+      colno: e.colno || null
+    }
+  });
+});
+window.addEventListener("unhandledrejection", (e) => {
+  sendEvent("error", { error: { message: String(e?.reason || "unhandledrejection") } });
+});
+
+// mouse + clicks + scroll
+document.addEventListener("mousemove", throttle((e) => {
+  sendEvent("mousemove", { x: e.clientX, y: e.clientY }); markActivity();
+}, 100));
+document.addEventListener("click", (e) => {
+  sendEvent("click", { button: e.button, x: e.clientX, y: e.clientY }); markActivity();
+}, true);
+document.addEventListener("scroll", throttle(() => {
+  sendEvent("scroll", { x: window.scrollX, y: window.scrollY }); markActivity();
+}, 200), { passive: true });
+
+// keyboard
+window.addEventListener("keydown", (e) => {
+  sendEvent("key", { phase: "down", key: e.key, code: e.code });
+  markActivity();
+}, { passive: true });
+window.addEventListener("keyup", (e) => {
+  sendEvent("key", { phase: "up", key: e.key, code: e.code });
+  markActivity();
+}, { passive: true });
+
+// entered + leaving page
+sendEvent("enter"); // when script runs (user entered)
+window.addEventListener("beforeunload", () => {
+  const now = Date.now();
+  if (idleStart && now - idleStart >= IDLE_MS) {
+    // flush pending idle first
+    fetch("/json/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(base({ type: "idle", endedAt: now, durationMs: now - idleStart })),
+      keepalive: true
+    });
+  }
+  // record leave
+  fetch("/json/events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(base({ type: "leave" })),
+    keepalive: true
+  });
+});
+
+// -------- init — wait for full load so timings are final --------
 function boot() {
   const onLoad = async () => {
-    const base = getStaticSync();
+    const staticSync = getStaticSync();
     const [imagesEnabled, cssEnabled] = await Promise.all([
       detectImagesEnabled(),
       Promise.resolve(detectCssEnabled())
     ]);
     const performance = getPerformanceBlock();
 
-    // single combined POST
-    await postJSON("/json/events", { ...base, imagesEnabled, cssEnabled, performance });
+    // one combined POST: static + performance
+    await postJSON("/json/events", base({
+      type: "pageview",
+      static: { ...staticSync, imagesEnabled, cssEnabled },
+      performance
+    }));
 
     console.log("collector sessionId:", sessionId);
   };

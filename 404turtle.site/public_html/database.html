@@ -5,45 +5,285 @@
     <title>CSE135 Database View</title>
     <script src="https://cdn.zinggrid.com/zinggrid.min.js"></script>
     <style>
+      :root {
+        color-scheme: light dark;
+      }
       body {
-        font-family: system-ui, sans-serif;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
         margin: 24px;
+        line-height: 1.35;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      header h1 {
+        margin: 0;
+        font-size: 1.25rem;
+      }
+      .grids {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 28px;
       }
       zing-grid {
-        height: 80vh;
+        height: 60vh;
+      }
+      .toolbar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin: 6px 0 12px;
+      }
+      .toolbar button {
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        background: transparent;
+        cursor: pointer;
+      }
+      .subhead {
+        margin: 0 0 6px;
+        font-size: 1rem;
+        opacity: 0.8;
+      }
+      @media (min-width: 1200px) {
+        .grids {
+          grid-template-columns: 1fr 1fr;
+        }
+        .grid-span-2 {
+          grid-column: 1 / -1;
+        }
       }
     </style>
   </head>
   <body>
-    <h1>Static Data</h1>
-    <!-- ZingGrid pulls directly from your REST GET /api/static -->
-    <zing-grid
-      caption="static"
-      src="/api/static"
-      layout="row"
-      pager
-      page-size="50"
-      search
-      filter
-      sort
-      theme="default"
-    >
-      <zg-column index="id" type="number" header="ID" />
-      <zg-column index="session_id" header="Session" />
-      <zg-column index="ts" type="number" header="Timestamp" />
-      <zg-column index="page_url" header="Page URL" width="300" />
-      <zg-column index="path" header="Path" />
-      <zg-column index="language" header="Lang" />
-      <zg-column index="user_agent" header="User Agent" width="400" />
-      <zg-column index="screen_w" header="SW" type="number" />
-      <zg-column index="screen_h" header="SH" type="number" />
-      <zg-column index="viewport_w" header="VW" type="number" />
-      <zg-column index="viewport_h" header="VH" type="number" />
-      <zg-column index="network_type" header="Net" />
-      <zg-column index="cookies_enabled" header="Cookies" />
-      <zg-column index="js_enabled" header="JS" />
-      <zg-column index="images_enabled" header="Imgs" />
-      <zg-column index="css_enabled" header="CSS" />
-    </zing-grid>
+    <header>
+      <h1>CSE135 Data Browser</h1>
+      <div class="toolbar">
+        <button id="refreshAll">Refresh all</button>
+      </div>
+    </header>
+
+    <section class="grids">
+      <!-- STATIC -->
+      <div class="grid-span-2">
+        <h2 class="subhead">Static</h2>
+        <zing-grid
+          id="gridStatic"
+          caption="static"
+          src="/api/static"
+          data-base="/api/static"
+          layout="row"
+          pager
+          page-size="50"
+          search
+          filter
+          sort
+          theme="default"
+        >
+          <zg-column
+            index="id"
+            type="number"
+            header="ID"
+            sort="desc"
+          ></zg-column>
+          <zg-column index="session_id" header="Session"></zg-column>
+          <zg-column
+            index="ts"
+            type="number"
+            header="Timestamp (ms)"
+          ></zg-column>
+          <zg-column index="page_url" header="Page URL" width="320"></zg-column>
+          <zg-column index="path" header="Path"></zg-column>
+          <zg-column index="language" header="Lang"></zg-column>
+          <zg-column
+            index="user_agent"
+            header="User Agent"
+            width="420"
+          ></zg-column>
+          <zg-column index="screen_w" header="SW" type="number"></zg-column>
+          <zg-column index="screen_h" header="SH" type="number"></zg-column>
+          <zg-column index="viewport_w" header="VW" type="number"></zg-column>
+          <zg-column index="viewport_h" header="VH" type="number"></zg-column>
+          <zg-column index="network_type" header="Net"></zg-column>
+          <zg-column index="cookies_enabled" header="Cookies"></zg-column>
+          <zg-column index="js_enabled" header="JS"></zg-column>
+          <zg-column index="images_enabled" header="Imgs"></zg-column>
+          <zg-column index="css_enabled" header="CSS"></zg-column>
+          <zg-column header="When (Local)" renderer="tsHuman"></zg-column>
+        </zing-grid>
+      </div>
+
+      <!-- PERFORMANCE -->
+      <div>
+        <h2 class="subhead">Performance</h2>
+        <zing-grid
+          id="gridPerf"
+          caption="performance"
+          src="/api/performance"
+          data-base="/api/performance"
+          layout="row"
+          pager
+          page-size="50"
+          search
+          filter
+          sort
+          theme="default"
+        >
+          <zg-column
+            index="id"
+            type="number"
+            header="ID"
+            sort="desc"
+          ></zg-column>
+          <zg-column index="session_id" header="Session"></zg-column>
+          <zg-column index="page_url" header="Page URL" width="260"></zg-column>
+          <zg-column index="path" header="Path"></zg-column>
+          <zg-column index="ts" type="number" header="TS (ms)"></zg-column>
+          <zg-column
+            index="nav_start"
+            type="number"
+            header="Nav Start"
+          ></zg-column>
+          <zg-column
+            index="load_end"
+            type="number"
+            header="Load End"
+          ></zg-column>
+          <zg-column
+            index="total_ms"
+            type="number"
+            header="Total (ms)"
+          ></zg-column>
+          <zg-column header="When (Local)" renderer="tsHuman"></zg-column>
+          <zg-column
+            index="raw"
+            header="raw JSON"
+            width="320"
+            renderer="jsonPreview"
+          ></zg-column>
+        </zing-grid>
+      </div>
+
+      <!-- ACTIVITY -->
+      <div>
+        <h2 class="subhead">Activity</h2>
+        <zing-grid
+          id="gridAct"
+          caption="activity"
+          src="/api/activity"
+          data-base="/api/activity"
+          server
+          pager
+          page-size="50"
+          layout="row"
+          theme="default"
+        >
+          <zg-column
+            index="id"
+            type="number"
+            header="ID"
+            sort="desc"
+          ></zg-column>
+          <zg-column index="session_id" header="Session"></zg-column>
+          <zg-column index="page_url" header="Page URL" width="220"></zg-column>
+          <zg-column index="path" header="Path"></zg-column>
+          <zg-column index="ts" type="number" header="TS (ms)"></zg-column>
+          <zg-column header="When (Local)" renderer="tsHuman"></zg-column>
+          <zg-column index="type" header="Type"></zg-column>
+          <zg-column index="x" type="number" header="x"></zg-column>
+          <zg-column index="y" type="number" header="y"></zg-column>
+          <zg-column index="button" type="number" header="Btn"></zg-column>
+          <zg-column index="key_code" header="Key"></zg-column>
+          <zg-column index="scroll_x" type="number" header="sX"></zg-column>
+          <zg-column index="scroll_y" type="number" header="sY"></zg-column>
+          <zg-column
+            index="duration_ms"
+            type="number"
+            header="Dur (ms)"
+          ></zg-column>
+          <zg-column
+            index="error"
+            header="error JSON"
+            width="320"
+            renderer="jsonPreview"
+          ></zg-column>
+        </zing-grid>
+      </div>
+    </section>
+
+    <script>
+      // --- helpers ---
+      function escapeHtml(s) {
+        return String(s).replace(
+          /[&<>"']/g,
+          (m) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            }[m])
+        );
+      }
+
+      // Safe: works whether ZingGrid calls renderer with (value, cellRef) or (cellRef)
+      function tsHuman(value, cellRef) {
+        // If first arg looks like a cellRef (older examples), shift args
+        let cell = value && value.row && value.column ? value : cellRef;
+        let ts = null;
+
+        if (
+          typeof value === "number" ||
+          (typeof value === "string" && value.trim() !== "")
+        ) {
+          // If the column had an index, value may already be ts
+          ts = value;
+        } else if (cell && cell.row && cell.row.data) {
+          const row = cell.row.data;
+          ts = row.ts ?? row.timestamp ?? null;
+        }
+
+        if (ts == null) return "";
+        const d = new Date(Number(ts));
+        return isNaN(d) ? "" : d.toLocaleString();
+      }
+
+      // Safe JSON preview: accepts null | string | object
+      function jsonPreview(value /*, cellRef */) {
+        if (value == null || value === "") return "";
+        let out = value;
+        try {
+          if (typeof value !== "string") {
+            out = JSON.stringify(value);
+          } else {
+            const t = value.trim();
+            if (t.startsWith("{") || t.startsWith("["))
+              out = JSON.stringify(JSON.parse(t));
+            else out = t;
+          }
+        } catch {
+          out = String(value);
+        }
+        if (out.length > 180) out = out.slice(0, 180) + "…";
+        return `<code style="white-space:nowrap">${escapeHtml(out)}</code>`;
+      }
+
+      // Refresh helper (cache-busts the src)
+      function refreshGrid(zg) {
+        const base = zg.getAttribute("data-base") || zg.getAttribute("src");
+        zg.setAttribute(
+          "src",
+          base + (base.includes("?") ? "&" : "?") + "_=" + Date.now()
+        );
+      }
+      document.getElementById("refreshAll").addEventListener("click", () => {
+        document.querySelectorAll("zing-grid").forEach(refreshGrid);
+      });
+    </script>
   </body>
 </html>

@@ -7,6 +7,8 @@ const RETRY_MS = 4000;
 
 // endpoints
 const API_STATIC = "/api/static";
+const API_PERF = "/api/performance";
+const API_ACTIVITY = "/api/activity";
 const MOCK_EVENTS = "/json/events";
 
 let _q = [];
@@ -221,7 +223,7 @@ function getPerformanceBlock() {
 
 // -------- ACTIVITY --------
 function sendEvent(type, extra) {
-  postJSON(MOCK_EVENTS, base({ type, ...extra }));
+  postJSON(API_ACTIVITY, base({ type, ...extra }));
 }
 
 // idle ≥ 2s
@@ -342,6 +344,15 @@ function boot() {
         performance,
       })
     );
+    const perfRow = base({
+      type: "performance",
+      // map your getPerformanceBlock() to server fields
+      navStart: performance.start ?? null,
+      loadEnd: performance.end ?? null,
+      totalMs: performance.totalMs ?? null,
+      raw: performance.raw || null,
+    });
+    await postJSON(API_PERF, perfRow);
 
     const staticRow = base({
       type: "static",

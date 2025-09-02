@@ -1,6 +1,6 @@
 // /var/www/404turtle.site/api/index.js
 const express = require("express");
-const fs = require("fs");
+const pool = require("./db");
 const path = require("path");
 
 const app = express();
@@ -11,100 +11,99 @@ app.get("/health", (req, res) => res.json({ ok: true }));
 
 // --- STATIC TABLE (Checkpoint 2) ---
 // Seed from file if available, else use a couple of demo rows.
-const storePath = path.join(__dirname, "static.seed.json");
-let staticRows;
-try {
-  staticRows = JSON.parse(fs.readFileSync(storePath, "utf8"));
-} catch {
-  staticRows = [
-    {
-      id: 1,
-      type: "static",
-      sessionId: "demo1",
-      pageUrl: "https://404turtle.site/",
-      path: "/",
-      referrer: "",
-      timestamp: Date.now(),
-      userAgent:
-        "Mozilla/5.0 (Macintosh) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139 Safari/537.36",
-      language: "en-US",
-      cookiesEnabled: true,
-      jsEnabled: true,
-      imagesEnabled: true,
-      cssEnabled: true,
-      screen: { w: 1440, h: 900 },
-      viewport: { w: 1200, h: 800 },
-      networkType: "4g",
-    },
-    {
-      id: 2,
-      type: "static",
-      sessionId: "demo2",
-      pageUrl: "https://404turtle.site/another",
-      path: "/another",
-      referrer: "",
-      timestamp: Date.now() - 10000,
-      userAgent: "seed-UA-2",
-      language: "en-US",
-      cookiesEnabled: true,
-      jsEnabled: true,
-      imagesEnabled: true,
-      cssEnabled: true,
-      screen: { w: 1920, h: 1080 },
-      viewport: { w: 1280, h: 720 },
-      networkType: "wifi",
-    },
+app.get("/static", async (req, res) => {
+  const limit = Math.min(Number(req.query.limit || 1000), 5000);
+  const offset = Number(req.query.offset || 0);
+  const [rows] = await pool.query(
+    "SELECT * FROM static ORDER BY id DESC LIMIT ? OFFSET ?",
+    [limit, offset]
+  );
+  res.json(rows);
+});
+
+app.get("/static/:id", async (req, res) => {
+  const [rows] = await pool.query("SELECT * FROM static WHERE id = ?", [
+    req.params.id,
+  ]);
+  if (!rows.length) return res.sendStatus(404);
+  res.json(rows[0]);
+});
+
+app.post("/static", async (req, res) => {
+  // accept either a flat static row or a pageview shape with { static: {...} }
+  const s = req.body.static ? { ...req.body, ...req.body.static } : req.body;
+  const params = [
+    s.sessionId,
+    s.pageUrl,
+    s.path,
+    s.referrer || "",
+    s.timestamp,
+    s.userAgent,
+    s.language,
+    s.cookiesEnabled,
+    s.jsEnabled,
+    s.imagesEnabled,
+    s.cssEnabled,
+    s.screen?.w,
+    s.screen?.h,
+    s.viewport?.w,
+    s.viewport?.h,
+    s.networkType,
   ];
-}
-let nextId = staticRows.reduce((m, r) => Math.max(m, Number(r.id) || 0), 0) + 1;
-
-// (Optional) persist to file across restarts — uncomment save() calls below if you want.
-function save() {
-  try {
-    fs.writeFileSync(storePath, JSON.stringify(staticRows, null, 2));
-  } catch {}
-}
-
-// GET /api/static  -> list all
-app.get("/static", (req, res) => res.json(staticRows));
-
-// GET /api/static/:id -> one
-app.get("/static/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const row = staticRows.find((r) => Number(r.id) === id);
-  if (!row) return res.sendStatus(404);
-  res.json(row);
+  const [r] = await pool.query(
+    `INSERT INTO static
+ (session_id, page_url, path, referrer, ts, user_agent, language,
+  cookies_enabled, js_enabled, images_enabled, css_enabled,
+  screen_w, screen_h, viewport_w, viewport_h, network_type)
+ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    params
+  );
+  res.set("Location", `/api/static/${r.insertId}`);
+  res.status(201).json({ id: r.insertId, ...req.body });
 });
 
-// POST /api/static -> create
-app.post("/static", (req, res) => {
-  const row = { id: nextId++, ...req.body };
-  staticRows.push(row);
-  // save();
-  res.set("Location", `/api/static/${row.id}`);
-  res.status(201).json(row);
+app.put("/static/:id", async (req, res) => {
+  // simple full update; for partial updates you could build SET dynamically
+  const s = req.body;
+  const [r] = await pool.query(
+    `UPDATE static SET
+ session_id=?, page_url=?, path=?, referrer=?, ts=?, user_agent=?, language=?,
+ cookies_enabled=?, js_enabled=?, images_enabled=?, css_enabled=?,
+ screen_w=?, screen_h=?, viewport_w=?, viewport_h=?, network_type=?
+ WHERE id=?`,
+    [
+      s.sessionId,
+      s.pageUrl,
+      s.path,
+      s.referrer || "",
+      s.timestamp,
+      s.userAgent,
+      s.language,
+      s.cookiesEnabled,
+      s.jsEnabled,
+      s.imagesEnabled,
+      s.cssEnabled,
+      s.screen?.w,
+      s.screen?.h,
+      s.viewport?.w,
+      s.viewport?.h,
+      s.networkType,
+      req.params.id,
+    ]
+  );
+  if (!r.affectedRows) return res.sendStatus(404);
+  const [rows] = await pool.query("SELECT * FROM static WHERE id=?", [
+    req.params.id,
+  ]);
+  res.json(rows[0]);
 });
 
-// PUT /api/static/:id -> update
-app.put("/static/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const i = staticRows.findIndex((r) => Number(r.id) === id);
-  if (i < 0) return res.sendStatus(404);
-  staticRows[i] = { ...staticRows[i], ...req.body, id };
-  // save();
-  res.json(staticRows[i]);
+app.delete("/static/:id", async (req, res) => {
+  const [r] = await pool.query("DELETE FROM static WHERE id = ?", [
+    req.params.id,
+  ]);
+  res.sendStatus(r.affectedRows ? 204 : 404);
 });
 
-// DELETE /api/static/:id -> delete
-app.delete("/static/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const before = staticRows.length;
-  staticRows = staticRows.filter((r) => Number(r.id) !== id);
-  // save();
-  if (staticRows.length === before) return res.sendStatus(404);
-  res.sendStatus(204);
-});
-
-// --- start server ---
-const PORT = 4000;
-app.listen(PORT, () => console.log(`API listening on :${PORT}`));
+// ---- start
+app.listen(4000, () => console.log("API listening on :4000"));

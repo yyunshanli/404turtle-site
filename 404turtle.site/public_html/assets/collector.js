@@ -5,6 +5,10 @@ const Q_KEY = "collector_queue_v1";
 const MAX_QUEUE = 10000;
 const RETRY_MS = 4000;
 
+// endpoints
+const API_STATIC = "/api/static";
+const MOCK_EVENTS = "/json/events";
+
 let _q = [];
 function _loadQ() {
   try {
@@ -217,7 +221,7 @@ function getPerformanceBlock() {
 
 // -------- ACTIVITY --------
 function sendEvent(type, extra) {
-  postJSON("/json/events", base({ type, ...extra }));
+  postJSON(MOCK_EVENTS, base({ type, ...extra }));
 }
 
 // idle ≥ 2s
@@ -331,13 +335,27 @@ function boot() {
 
     // one combined POST: static + performance
     await postJSON(
-      "/json/events",
+      MOCK_EVENTS,
       base({
         type: "pageview",
         static: { ...staticSync, imagesEnabled, cssEnabled },
         performance,
       })
     );
+
+    const staticRow = base({
+      type: "static",
+      userAgent: staticSync.userAgent,
+      language: staticSync.language,
+      cookiesEnabled: staticSync.cookiesEnabled,
+      jsEnabled: true,
+      imagesEnabled,
+      cssEnabled,
+      screen: staticSync.screen,
+      viewport: staticSync.viewport,
+      networkType: staticSync.networkType,
+    });
+    await postJSON(API_STATIC, staticRow);
 
     console.log("collector sessionId:", sessionId);
   };

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>CSE135 Database View</title>
+    <script src="https://cdn.zinggrid.com/zinggrid.min.js"></script>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 24px;
+      }
+      zing-grid {
+        height: 80vh;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Static Data</h1>
+    <!-- ZingGrid pulls directly from your REST GET /api/static -->
+    <zing-grid
+      caption="static"
+      src="/api/static"
+      layout="row"
+      pager
+      page-size="50"
+      search
+      filter
+      sort
+      theme="default"
+    >
+      <zg-column index="id" type="number" header="ID" />
+      <zg-column index="session_id" header="Session" />
+      <zg-column index="ts" type="number" header="Timestamp" />
+      <zg-column index="page_url" header="Page URL" width="300" />
+      <zg-column index="path" header="Path" />
+      <zg-column index="language" header="Lang" />
+      <zg-column index="user_agent" header="User Agent" width="400" />
+      <zg-column index="screen_w" header="SW" type="number" />
+      <zg-column index="screen_h" header="SH" type="number" />
+      <zg-column index="viewport_w" header="VW" type="number" />
+      <zg-column index="viewport_h" header="VH" type="number" />
+      <zg-column index="network_type" header="Net" />
+      <zg-column index="cookies_enabled" header="Cookies" />
+      <zg-column index="js_enabled" header="JS" />
+      <zg-column index="images_enabled" header="Imgs" />
+      <zg-column index="css_enabled" header="CSS" />
+    </zing-grid>
+  </body>
+</html>

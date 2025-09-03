@@ -1,15 +1,27 @@
 // /var/www/404turtle.site/api/db.cjs
 const mysql = require("mysql2/promise");
-require("dotenv").config(); // <-- use require, not import
+const fs = require("fs");
+require("dotenv").config();
+
+const wantSSL = /^(1|true|yes)$/i.test(process.env.DB_SSL || "");
+const ssl = wantSSL
+  ? {
+      rejectUnauthorized: true,
+      ca: process.env.DB_SSL_CA
+        ? fs.readFileSync(process.env.DB_SSL_CA, "utf8")
+        : undefined,
+    }
+  : undefined;
 
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || "127.0.0.1",
-  user: process.env.DB_USER || "cse135",
-  password: process.env.DB_PASS || "YOUR_STRONG_PW",
-  database: process.env.DB_NAME || "cse135",
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT) || 25060,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME,
+  ssl,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0,
 });
 
 module.exports = pool;

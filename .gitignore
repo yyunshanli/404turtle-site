@@ -1,3 +1,4 @@
 .vscode/
 webhook.php
 404turtle.site/api/.env
+404turtle.site/api/ca-certificate.crt

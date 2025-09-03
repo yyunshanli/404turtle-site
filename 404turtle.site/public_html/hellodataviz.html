@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>helloDataViz · CSE 135</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://cdn.zingchart.com/zingchart.min.js"></script>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 20px;
+      }
+      header {
+        margin-bottom: 16px;
+      }
+      .status {
+        font-size: 14px;
+        color: #555;
+      }
+      .grid {
+        display: grid;
+        gap: 20px;
+      }
+      @media (min-width: 900px) {
+        .grid {
+          grid-template-columns: 2fr 1fr;
+        }
+        .wide {
+          grid-column: 1 / 3;
+        }
+      }
+      .chart {
+        width: 100%;
+        height: 360px;
+        border: 1px solid #ccc;
+      }
+      h2 {
+        margin: 0 0 6px;
+        font-size: 18px;
+      }
+      p.sub {
+        margin: 0 0 10px;
+        font-size: 13px;
+        color: #555;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>helloDataViz</h1>
+      <p>
+        Live data from <code>/api/performance</code> and
+        <code>/api/static</code>.
+      </p>
+      <div class="status" id="status">Loading…</div>
+    </header>
+
+    <section class="grid">
+      <article class="wide">
+        <h2>Page Load Percentiles (ms)</h2>
+        <p class="sub">p50 / p90 / p99 by minute</p>
+        <div id="linePct" class="chart"></div>
+      </article>
+
+      <article>
+        <h2>Median Load by Network Type</h2>
+        <p class="sub">Compare segments (wifi / 4g / 3g / unknown …)</p>
+        <div id="barNetMed" class="chart"></div>
+      </article>
+
+      <article>
+        <h2>User Languages</h2>
+        <p class="sub">Pie chart with legend</p>
+        <div id="pieLang" class="chart"></div>
+      </article>
+    </section>
+
+    <script>
+      const statusEl = document.getElementById("status");
+
+      async function fetchJSON(url) {
+        const res = await fetch(url, { credentials: "include" });
+        const text = await res.text();
+        if (!res.ok)
+          throw new Error(
+            `${url} -> ${res.status} ${res.statusText}\n${text.slice(0, 500)}`
+          );
+        try {
+          return JSON.parse(text);
+        } catch {
+          throw new Error(`${url} returned non-JSON:\n${text.slice(0, 500)}`);
+        }
+      }
+      const toArray = (x) =>
+        Array.isArray(x)
+          ? x
+          : x && Array.isArray(x.data)
+          ? x.data
+          : x && Array.isArray(x.rows)
+          ? x.rows
+          : x && Array.isArray(x.result)
+          ? x.result
+          : [];
+      const num = (x) => {
+        const n = Number(x);
+        return Number.isFinite(n) ? n : 0;
+      };
+      const niceMinute = (t) => {
+        const d = new Date(num(t));
+        d.setSeconds(0, 0);
+        return d.getTime();
+      };
+
+      function percentile(sorted, p) {
+        if (!sorted.length) return 0;
+        const idx = (p / 100) * (sorted.length - 1);
+        const lo = Math.floor(idx),
+          hi = Math.ceil(idx);
+        if (lo === hi) return sorted[lo];
+        const w = idx - lo;
+        return Math.round(sorted[lo] * (1 - w) + sorted[hi] * w);
+      }
+
+      function perfTransforms(perfRaw, staticRaw) {
+        const perf = toArray(perfRaw);
+        const stat = toArray(staticRaw);
+
+        const sidToNet = new Map();
+        for (const s of stat) {
+          const sid = s.sessionId || s.session_id || null;
+          const net = s.networkType || s.network_type || "unknown";
+          if (sid) sidToNet.set(sid, net);
+        }
+
+        const rows = perf.map((r) => {
+          const sid = r.sessionId || r.session_id || null;
+          const ts = r.timestamp ?? r.ts ?? r.navStart ?? r.start ?? Date.now();
+          const total =
+            r.totalMs ??
+            r.total_ms ??
+            (r.loadEnd != null && r.navStart != null
+              ? num(r.loadEnd) - num(r.navStart)
+              : 0);
+          const net = sidToNet.get(sid) || "unknown";
+          return { ts: num(ts), total: num(total), net };
+        });
+
+        // Percentiles by minute
+        const byMin = new Map();
+        for (const r of rows) {
+          const m = niceMinute(r.ts);
+          const arr = byMin.get(m) || [];
+          arr.push(r.total);
+          byMin.set(m, arr);
+        }
+        const mins = [...byMin.keys()].sort((a, b) => a - b);
+        const labels = mins.map((t) => new Date(t).toLocaleTimeString());
+        const p50 = [],
+          p90 = [],
+          p99 = [];
+        for (const m of mins) {
+          const arr = byMin.get(m).sort((a, b) => a - b);
+          p50.push(percentile(arr, 50));
+          p90.push(percentile(arr, 90));
+          p99.push(percentile(arr, 99));
+        }
+
+        // Median by network type
+        const byNet = new Map();
+        for (const r of rows) {
+          const arr = byNet.get(r.net) || [];
+          arr.push(r.total);
+          byNet.set(r.net, arr);
+        }
+        const nets = [...byNet.keys()].sort();
+        const medians = nets.map((n) => {
+          const arr = byNet.get(n).sort((a, b) => a - b);
+          return percentile(arr, 50);
+        });
+
+        return { labels, p50, p90, p99, nets, medians };
+      }
+
+      function langPie(staticRaw) {
+        const stat = toArray(staticRaw);
+        const counts = new Map();
+        for (const r of stat) {
+          const lang = (r.language || "unknown").trim();
+          counts.set(lang, (counts.get(lang) || 0) + 1);
+        }
+        return [...counts.entries()].map(([text, value]) => ({
+          text,
+          values: [value],
+        }));
+      }
+
+      function renderPct(labels, p50, p90, p99) {
+        zingchart.render({
+          id: "linePct",
+          height: "100%",
+          width: "100%",
+          data: {
+            type: "line",
+            scaleX: { labels },
+            scaleY: { label: { text: "ms" } },
+            legend: {},
+            series: [
+              { text: "p50", values: p50 },
+              { text: "p90", values: p90 },
+              { text: "p99", values: p99 },
+            ],
+          },
+        });
+      }
+      function renderNetMed(nets, medians) {
+        zingchart.render({
+          id: "barNetMed",
+          height: "100%",
+          width: "100%",
+          data: {
+            type: "bar",
+            scaleX: { labels: nets },
+            scaleY: { label: { text: "median ms" } },
+            series: [{ text: "median", values: medians }],
+          },
+        });
+      }
+      function renderLangPie(series) {
+        zingchart.render({
+          id: "pieLang",
+          height: "100%",
+          width: "100%",
+          data: {
+            type: "pie",
+            legend: { visible: true, toggleAction: "remove" },
+            series,
+          },
+        });
+      }
+
+      async function loadLive() {
+        statusEl.textContent = "Loading live data…";
+        try {
+          const [perf, stat] = await Promise.all([
+            fetchJSON("/api/performance?limit=5000"),
+            fetchJSON("/api/static?limit=5000"),
+          ]);
+
+          const { labels, p50, p90, p99, nets, medians } = perfTransforms(
+            perf,
+            stat
+          );
+          renderPct(labels, p50, p90, p99);
+          renderNetMed(nets, medians);
+          renderLangPie(langPie(stat));
+
+          statusEl.textContent = "Live data loaded ✓";
+        } catch (err) {
+          console.error("[hellodataviz] Live data error:", err);
+          statusEl.textContent = "Error loading live data — see console";
+        }
+      }
+      loadLive();
+    </script>
+  </body>
+</html>

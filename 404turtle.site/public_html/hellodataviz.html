@@ -254,7 +254,7 @@
           renderNetMed(nets, medians);
           renderLangPie(langPie(stat));
 
-          statusEl.textContent = "Live data loaded ✓";
+          statusEl.textContent = "Live data loaded";
         } catch (err) {
           console.error("[hellodataviz] Live data error:", err);
           statusEl.textContent = "Error loading live data — see console";

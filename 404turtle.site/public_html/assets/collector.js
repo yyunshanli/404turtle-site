@@ -1,5 +1,3 @@
-// ===== collector.js (STATIC + PERFORMANCE + ACTIVITY) =====
-
 // local buffering
 const Q_KEY = "collector_queue_v1";
 const MAX_QUEUE = 10000;
@@ -25,7 +23,7 @@ function _saveQ() {
   } catch {}
 }
 function _enqueue(item) {
-  // Backpressure: drop oldest
+  // drop oldest
   if (_q.length >= MAX_QUEUE) _q.shift();
   _q.push(item);
   _saveQ();
@@ -71,19 +69,18 @@ function _scheduleRetry() {
     try {
       await _trySendOne();
     } catch {
-      /* ignore; will retry next tick */
+      /* retry next tick */
     }
   }, RETRY_MS);
 }
 _scheduleRetry();
 
-// Also retry when we come back online / tab becomes visible
+// Retry when come back online
 addEventListener("online", () => _trySendOne());
 addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") _trySendOne();
 });
 
-// Drain as much as we can on pagehide (Safari-friendly)
 addEventListener("pagehide", () => {
   if (!_q.length || !navigator.sendBeacon) return;
   for (const env of _q) {
@@ -96,7 +93,7 @@ addEventListener("pagehide", () => {
   _saveQ();
 });
 
-// stable session id
+// Session id
 function genId() {
   return Math.random().toString(36).slice(2) + Date.now();
 }
@@ -126,7 +123,7 @@ async function postJSON(path, payload) {
   }
 }
 
-// -------- helpers --------
+// helpers to detect features
 function detectImagesEnabled() {
   return new Promise((resolve) => {
     const img = new Image();
@@ -185,7 +182,6 @@ function base(extra = {}) {
   };
 }
 
-// -------- static snapshot (sync) --------
 function getStaticSync() {
   return {
     userAgent: navigator.userAgent || "",
@@ -198,7 +194,6 @@ function getStaticSync() {
   };
 }
 
-// -------- minimal performance block (after load) --------
 function getPerformanceBlock() {
   try {
     const nav = performance.getEntriesByType?.("navigation")?.[0];
@@ -313,7 +308,7 @@ window.addEventListener("visibilitychange", () => {
 });
 
 // entered + leaving page
-sendEvent("enter"); // when script runs (user entered)
+sendEvent("enter");
 window.addEventListener("beforeunload", () => {
   const now = Date.now();
   if (idleStart && now - idleStart >= IDLE_MS) {
@@ -325,7 +320,7 @@ window.addEventListener("beforeunload", () => {
   postJSON("/json/events", base({ type: "leave" }));
 });
 
-// -------- init — wait for full load so timings are final --------
+// -------- BOOT --------
 function boot() {
   const onLoad = async () => {
     const staticSync = getStaticSync();
@@ -346,7 +341,6 @@ function boot() {
     );
     const perfRow = base({
       type: "performance",
-      // map your getPerformanceBlock() to server fields
       navStart: performance.start ?? null,
       loadEnd: performance.end ?? null,
       totalMs: performance.totalMs ?? null,

@@ -2,60 +2,62 @@
 <html>
   <head>
     <meta charset="utf-8" />
+    <script src="/assets/collector.js" defer></script>
     <title>CSE135 Database View</title>
     <script src="https://cdn.zinggrid.com/zinggrid.min.js"></script>
     <style>
+      /* layout */
       :root {
         color-scheme: light dark;
+        --zg-font-size: 12px;
+        --zg-row-height: 28px;
+      }
+      * {
+        box-sizing: border-box;
       }
       body {
         font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        margin: 24px;
-        line-height: 1.35;
+        margin: 12px;
+        line-height: 1.3;
       }
       header {
         display: flex;
         align-items: center;
-        gap: 12px;
-        margin-bottom: 12px;
+        gap: 8px;
+        margin-bottom: 8px;
       }
       header h1 {
         margin: 0;
-        font-size: 1.25rem;
-      }
-      .grids {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 28px;
-      }
-      zing-grid {
-        height: 60vh;
+        font-size: 1rem;
       }
       .toolbar {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        margin: 6px 0 12px;
+        margin-left: auto;
       }
       .toolbar button {
-        padding: 8px 12px;
-        border-radius: 8px;
+        padding: 6px 10px;
         border: 1px solid #ccc;
         background: transparent;
         cursor: pointer;
       }
+
+      .grids {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+
+      /* Make each grid compact and scroll */
+      zing-grid {
+        width: 100%;
+        height: 38vh;
+        min-height: 260px;
+        overflow: auto;
+      }
+
       .subhead {
         margin: 0 0 6px;
-        font-size: 1rem;
-        opacity: 0.8;
-      }
-      @media (min-width: 1200px) {
-        .grids {
-          grid-template-columns: 1fr 1fr;
-        }
-        .grid-span-2 {
-          grid-column: 1 / -1;
-        }
+        font-size: 0.95rem;
+        opacity: 0.9;
       }
     </style>
   </head>
@@ -68,7 +70,7 @@
     </header>
 
     <section class="grids">
-      <!-- STATIC -->
+      <!-- Static -->
       <div class="grid-span-2">
         <h2 class="subhead">Static</h2>
         <zing-grid
@@ -96,13 +98,13 @@
             type="number"
             header="Timestamp (ms)"
           ></zg-column>
-          <zg-column index="page_url" header="Page URL" width="320"></zg-column>
+          <zg-column index="page_url" header="Page URL" width="260"></zg-column>
           <zg-column index="path" header="Path"></zg-column>
           <zg-column index="language" header="Lang"></zg-column>
           <zg-column
             index="user_agent"
             header="User Agent"
-            width="420"
+            width="300"
           ></zg-column>
           <zg-column index="screen_w" header="SW" type="number"></zg-column>
           <zg-column index="screen_h" header="SH" type="number"></zg-column>
@@ -140,7 +142,7 @@
             sort="desc"
           ></zg-column>
           <zg-column index="session_id" header="Session"></zg-column>
-          <zg-column index="page_url" header="Page URL" width="260"></zg-column>
+          <zg-column index="page_url" header="Page URL" width="220"></zg-column>
           <zg-column index="path" header="Path"></zg-column>
           <zg-column index="ts" type="number" header="TS (ms)"></zg-column>
           <zg-column
@@ -162,7 +164,7 @@
           <zg-column
             index="raw"
             header="raw JSON"
-            width="320"
+            width="260"
             renderer="jsonPreview"
           ></zg-column>
         </zing-grid>
@@ -189,7 +191,7 @@
             sort="desc"
           ></zg-column>
           <zg-column index="session_id" header="Session"></zg-column>
-          <zg-column index="page_url" header="Page URL" width="220"></zg-column>
+          <zg-column index="page_url" header="Page URL" width="200"></zg-column>
           <zg-column index="path" header="Path"></zg-column>
           <zg-column index="ts" type="number" header="TS (ms)"></zg-column>
           <zg-column header="When (Local)" renderer="tsHuman"></zg-column>
@@ -208,7 +210,7 @@
           <zg-column
             index="error"
             header="error JSON"
-            width="320"
+            width="240"
             renderer="jsonPreview"
           ></zg-column>
         </zing-grid>
@@ -216,7 +218,6 @@
     </section>
 
     <script>
-      // --- helpers ---
       function escapeHtml(s) {
         return String(s).replace(
           /[&<>"']/g,
@@ -231,36 +232,29 @@
         );
       }
 
-      // Safe: works whether ZingGrid calls renderer with (value, cellRef) or (cellRef)
       function tsHuman(value, cellRef) {
-        // If first arg looks like a cellRef (older examples), shift args
         let cell = value && value.row && value.column ? value : cellRef;
         let ts = null;
-
         if (
           typeof value === "number" ||
           (typeof value === "string" && value.trim() !== "")
         ) {
-          // If the column had an index, value may already be ts
           ts = value;
         } else if (cell && cell.row && cell.row.data) {
           const row = cell.row.data;
           ts = row.ts ?? row.timestamp ?? null;
         }
-
         if (ts == null) return "";
         const d = new Date(Number(ts));
         return isNaN(d) ? "" : d.toLocaleString();
       }
 
-      // Safe JSON preview: accepts null | string | object
-      function jsonPreview(value /*, cellRef */) {
+      function jsonPreview(value) {
         if (value == null || value === "") return "";
         let out = value;
         try {
-          if (typeof value !== "string") {
-            out = JSON.stringify(value);
-          } else {
+          if (typeof value !== "string") out = JSON.stringify(value);
+          else {
             const t = value.trim();
             if (t.startsWith("{") || t.startsWith("["))
               out = JSON.stringify(JSON.parse(t));
@@ -273,7 +267,6 @@
         return `<code style="white-space:nowrap">${escapeHtml(out)}</code>`;
       }
 
-      // Refresh helper (cache-busts the src)
       function refreshGrid(zg) {
         const base = zg.getAttribute("data-base") || zg.getAttribute("src");
         zg.setAttribute(

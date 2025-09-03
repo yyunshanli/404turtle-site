@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <title>helloDataViz · CSE 135</title>
+    <script src="/assets/collector.js" defer></script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="https://cdn.zingchart.com/zingchart.min.js"></script>
     <style>
@@ -15,7 +16,6 @@
       }
       .status {
         font-size: 14px;
-        color: #555;
       }
       .grid {
         display: grid;
@@ -32,7 +32,7 @@
       .chart {
         width: 100%;
         height: 360px;
-        border: 1px solid #ccc;
+        border: 1px solid;
       }
       h2 {
         margin: 0 0 6px;
@@ -41,20 +41,17 @@
       p.sub {
         margin: 0 0 10px;
         font-size: 13px;
-        color: #555;
       }
     </style>
   </head>
   <body>
     <header>
       <h1>helloDataViz</h1>
-      <p>
-        Live data from <code>/api/performance</code> and
-        <code>/api/static</code>.
-      </p>
+      <p>Live data</p>
       <div class="status" id="status">Loading…</div>
     </header>
 
+    <!-- 3-series line chart -->
     <section class="grid">
       <article class="wide">
         <h2>Page Load Percentiles (ms)</h2>
@@ -62,15 +59,17 @@
         <div id="linePct" class="chart"></div>
       </article>
 
+      <!-- 2-series bar chart -->
       <article>
-        <h2>Median Load by Network Type</h2>
-        <p class="sub">Compare segments (wifi / 4g / 3g / unknown …)</p>
-        <div id="barNetMed" class="chart"></div>
+        <h2>Page Visits by Path (Top 10)</h2>
+        <p class="sub">Counts of path visits</p>
+        <div id="barPageVisits" class="chart"></div>
       </article>
 
+      <!-- Pie chart -->
       <article>
         <h2>User Languages</h2>
-        <p class="sub">Pie chart with legend</p>
+        <p class="sub">Pie chart of user language distribution</p>
         <div id="pieLang" class="chart"></div>
       </article>
     </section>
@@ -91,6 +90,7 @@
           throw new Error(`${url} returned non-JSON:\n${text.slice(0, 500)}`);
         }
       }
+
       const toArray = (x) =>
         Array.isArray(x)
           ? x
@@ -101,6 +101,7 @@
           : x && Array.isArray(x.result)
           ? x.result
           : [];
+
       const num = (x) => {
         const n = Number(x);
         return Number.isFinite(n) ? n : 0;
@@ -111,6 +112,7 @@
         return d.getTime();
       };
 
+      // Percentile helpers
       function percentile(sorted, p) {
         if (!sorted.length) return 0;
         const idx = (p / 100) * (sorted.length - 1);
@@ -165,22 +167,10 @@
           p99.push(percentile(arr, 99));
         }
 
-        // Median by network type
-        const byNet = new Map();
-        for (const r of rows) {
-          const arr = byNet.get(r.net) || [];
-          arr.push(r.total);
-          byNet.set(r.net, arr);
-        }
-        const nets = [...byNet.keys()].sort();
-        const medians = nets.map((n) => {
-          const arr = byNet.get(n).sort((a, b) => a - b);
-          return percentile(arr, 50);
-        });
-
-        return { labels, p50, p90, p99, nets, medians };
+        return { labels, p50, p90, p99 };
       }
 
+      // Languages pie
       function langPie(staticRaw) {
         const stat = toArray(staticRaw);
         const counts = new Map();
@@ -192,6 +182,33 @@
           text,
           values: [value],
         }));
+      }
+
+      // Page visits by path
+      function pageVisits(staticRaw, topN = 10) {
+        const stat = toArray(staticRaw);
+        const map = new Map(); // path -> count
+        for (const r of stat) {
+          let path = r.path || "";
+          if (!path && r.pageUrl) {
+            try {
+              path = new URL(r.pageUrl).pathname;
+            } catch {}
+          }
+          if (!path) path = "(unknown)";
+          map.set(path, (map.get(path) || 0) + 1);
+        }
+        // sort by count desc
+        const sorted = [...map.entries()].sort((a, b) => b[1] - a[1]);
+        const top = sorted.slice(0, topN);
+        const rest = sorted.slice(topN);
+        const labels = top.map(([p]) => p);
+        const values = top.map(([, c]) => c);
+        if (rest.length) {
+          labels.push("other");
+          values.push(rest.reduce((sum, [, c]) => sum + c, 0));
+        }
+        return { labels, values };
       }
 
       function renderPct(labels, p50, p90, p99) {
@@ -212,19 +229,21 @@
           },
         });
       }
-      function renderNetMed(nets, medians) {
+
+      function renderPageVisits(labels, values) {
         zingchart.render({
-          id: "barNetMed",
+          id: "barPageVisits",
           height: "100%",
           width: "100%",
           data: {
             type: "bar",
-            scaleX: { labels: nets },
-            scaleY: { label: { text: "median ms" } },
-            series: [{ text: "median", values: medians }],
+            scaleX: { labels },
+            scaleY: { label: { text: "visits" } },
+            series: [{ text: "visits", values }],
           },
         });
       }
+
       function renderLangPie(series) {
         zingchart.render({
           id: "pieLang",
@@ -238,6 +257,7 @@
         });
       }
 
+      // Boot
       async function loadLive() {
         statusEl.textContent = "Loading live data…";
         try {
@@ -246,12 +266,12 @@
             fetchJSON("/api/static?limit=5000"),
           ]);
 
-          const { labels, p50, p90, p99, nets, medians } = perfTransforms(
-            perf,
-            stat
-          );
+          const { labels, p50, p90, p99 } = perfTransforms(perf, stat);
           renderPct(labels, p50, p90, p99);
-          renderNetMed(nets, medians);
+
+          const pv = pageVisits(stat, 10);
+          renderPageVisits(pv.labels, pv.values);
+
           renderLangPie(langPie(stat));
 
           statusEl.textContent = "Live data loaded";

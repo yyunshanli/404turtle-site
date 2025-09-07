@@ -55,6 +55,11 @@ Same idea as landings, but for the last page someone saw. If a page shows up her
 
 This shows how the total pageviews are split across pages. We limit it to the top handful and roll the tiny ones into “Other” so the donut doesn’t turn hard to read. Each slice is labeled with a percent, so you don’t have to guess. We tried other shapes (stacked bars), but at this small size, the donut communicates “who’s biggest” the fastest.
 
+## Recent Errors — table  
+
+We list the most recent error events with four columns: When, Path, Message, and Source. A table works better than a chart here because you usually need the exact text (to search logs or copy into an issue) and the page it happened on. Rows are sorted newest-first and capped so the list stays readable. The line chart above handles the “how many over time” view, while this table handles the “what exactly happened” view. This is good for spotting repeats (same message/source), noisy third-party scripts, and quick checks after a deploy.
+
+
 
 # Homework 1
 ## Details of Github auto deploy setup

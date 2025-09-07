@@ -101,15 +101,13 @@
       <p><strong>Question:</strong> What are users trying my website for?</p>
       <p>
         <strong>Answer:</strong>
-        Because this site mainly hosts <em>completed assignments</em>,
-        <strong>Home (/)</strong> , the portfolio index , naturally has the
+        Siunce this site mainly hosts <em>completed assignments</em>,
+        <strong>Home (/)</strong> , the main page naturally has the
         largest share of views and is both the <em>top landing</em> and
-        <em>top exit</em>. Most sessions are quick check-ins to confirm a
-        submission or to open a specific deliverable. The next most-visited
-        pages are individual assignment pages such as
-        <code>/hellodataviz.html</code>, <code>/database.html</code>,
-        <code>/members/angelchavez.html</code>, <code>/index.html</code>, and
-        <code>/cgi-bin/php-sessions-2.php</code>. Overall, the patterns reflect
+        <em>top exit</em>. Most sessions look like quick check ins to confirm a
+        submission or to open a specific deliverable. After Home, the most visited pages are the actual assignment links like
+        <code>/hellodataviz.html</code>, <code>/database.html</code>, <code>/members/angelchavez.html</code>,
+        <code>/index.html</code>, and <code>/cgi-bin/php-sessions-2.php</code>. Overall, the patterns reflect
         a submission/portfolio workflow rather than deep site exploration.
       </p>
       <p class="meta">
@@ -130,10 +128,9 @@
           ></div>
           <p class="meta">
             <strong>Why a bar chart?</strong>
-            Landings are discrete pages, so we're comparing counts across
-            categories. Bars make page-to-page differences obvious, handle long
-            labels (paths), and let us sort by volume. Lines imply time; pies
-            obscure small but important pages.
+            We're comparing pages/categories, not tracking time. Bars make the differences obvious, handle long paths,
+            and let me sort by volume. Lines would imply a timeline but pies hide small but important pages.
+
           </p>
         </article>
 
@@ -144,8 +141,8 @@
             <strong>Why a bar chart?</strong>
             Exit counts are categorical comparisons, not a time series. A bar
             chart highlights which pages most often end a session and how they
-            rank relative to each other,useful for spotting potential “dead
-            ends” versus healthy endpoints.
+            rank relative to each other, which is useful for spotting potential “dead
+            ends” versus normal endpoints.
           </p>
         </article>
       </div>
@@ -160,8 +157,8 @@
         <p class="meta">
           <strong>Why a donut chart?</strong>
           This view is about composition,how total traffic is split across
-          pages. A donut communicates proportion at a glance. We collapse small
-          slices into “Other” to keep labels readable; for deeper analysis we
+          pages. A donut communicates proportion at a glance. I roll tiny 
+          slices into “Other” so labels don't get messy but for deeper analysis we
           pair this with the table below.
         </p>
       </article>
@@ -195,37 +192,33 @@
     <article class="card" style="margin-top: 10px">
       <h2>Discussion</h2>
       <p>
-        The intent patterns match how this site is used: it's a
+        The data lines up with how I use the site. it's a
         <em>homework portfolio</em>. The <strong>Home (/)</strong> page
-        concentrates most landings and exits, indicating that many visits are
-        quick check-ins to open or verify a single deliverable. The
-        <em>Traffic Share</em> chart shows a long tail of assignment pages; a
-        few draw the bulk of attention (e.g., data-viz and database tasks),
-        while others receive occasional visits,consistent with TAs opening
-        specific submissions.
+        has the most landings and exits, which basically means that many visits are
+        quick check ins to open or verify a single assignment/file. The
+        <em>Traffic Share</em> chart shows a long tail of assignment pages—some get most of the attention (like data-viz/database work),
+        while others are opened occasionally. That looks exactly like TAs/students checking a specific submission.
       </p>
       <p>
         The <em>Top Landing</em> and <em>Top Exit</em> bars together suggest
-        short, purpose-driven journeys: sessions usually start on Home and end
-        on the specific assignment page the visitor came for. That's expected
-        for a submission hub and doesn't imply a navigation problem,just that
-        “exploration” isn't the goal. For this audience, the primary success
-        metric is whether key deliverables are easy to locate and open quickly.
+        short, journey where you start on Home, jump to the assignment you need, then you're done. That's expected
+        for a this kind off site and doesn't imply a navigation problem, ust that
+        “exploration” isn't the goal. What matters is that the main links are
+        easy to find and each assignment page opens without friction.
       </p>
       <p>
-        <strong>Implications for users (TAs/students):</strong> keep the
-        portfolio index clear and stable; use consistent naming for assignment
-        links; and ensure each assignment page loads reliably and presents the
-        work without extra clicks. Deep cross-linking between assignments is
-        optional because the typical flow is “arrive → open one deliverable →
-        leave.”
+       <strong>What this means for TAs/students:</strong> keep the portfolio index 
+       clear, name assignment links consistently,
+        and make sure each assignment page loads reliably and gets straight to the 
+        point.
+
       </p>
       <p class="meta">
         <strong>Limitations & assumptions:</strong> landings/exits are derived
-        from the first/last page per session in the sampled logs; some sessions
-        are very short or include background tabs; and small pages in the tail
-        can move around with limited data. Trends are most reliable for the top
-        pages.
+        from the first/last page per session in the sampled logsbut some sessions
+        are very short and background tabs can skew things. Small pages in the tail
+        can move around with limited data. The trends for the top pages
+        are the most reliable.
       </p>
     </article>
 

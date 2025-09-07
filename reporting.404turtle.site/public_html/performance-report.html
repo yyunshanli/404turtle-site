@@ -5,7 +5,6 @@
     <title>Detailed Report: Performance</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Reuse your existing libs/renderers -->
     <script src="https://cdn.zingchart.com/zingchart.min.js" defer></script>
     <script src="./charts-errors.js" defer></script>
     <script src="./charts-pages.js" defer></script>
@@ -97,7 +96,7 @@
     </div>
 
     <div class="qa">
-      <p><strong>Question:</strong> How is the performance of my website?</p>
+      <p><strong>Question:</strong> How is the performance of our website?</p>
       <p>
         <strong>Answer:</strong>
         Over the last 24h, overall mean load is <span id="ansMean">—</span> ms
@@ -121,9 +120,13 @@
           <div id="chartErrors" class="zc" aria-label="Errors per minute"></div>
           <p class="meta">
             <strong>Why a line chart?</strong>
-            Errors are time-based events. Plotting rate (errors/min) as a line
-            exposes spikes and trends, supports before/after comparisons (e.g.,
-            a deploy), and smooths second-level noise.
+            We count how many error events happen each minute and draw that as a
+            line over time. Using “per minute” evens out busy and quiet periods.
+            The line makes spikes jump out fast. It’s easy to line up a spike
+            with something that happened (a deploy, a busy hour), and the
+            timestamps help when you’re digging into logs later. We tried
+            fancier versions (stacked by type, heatmaps), but they were harder
+            to read at a glance, so we kept it simple.
           </p>
         </article>
 
@@ -132,9 +135,12 @@
           <div id="chartPages" class="zc" aria-label="Mean load by page"></div>
           <p class="meta">
             <strong>Why a bar chart?</strong>
-            We’re comparing categories (pages). Bars make relative “heaviness”
-            clear and rankable. (This reuses the shared renderer; values here
-            are <em>mean</em> ms.)
+            For performance, we look at the typical (median) load time for each
+            page and show the worst five. We use the median on purpose so one
+            weird, super-slow visit doesn’t sway the result. Bars are good here
+            because you just want to see which pages are slower than the others
+            without thinking too hard. We considered box plots to show spread,
+            but that felt like overkill for a dashboard you skim.
           </p>
         </article>
       </div>
@@ -168,19 +174,15 @@
     <article class="card" style="margin-top: 10px">
       <h2>Discussion</h2>
       <p>
-        Overall performance is healthy for a homework/portfolio site. The
-        <em>Errors per Minute</em> line stays near zero with no sustained
-        spikes, and central latency (p50) is low. The <em>Mean Load by Page</em>
-        chart highlights a small set of heavier pages; these are typically demos
-        or pages with larger assets. The grid shows per-page samples, p50, and
-        p95: even if mean is acceptable, a high p95 indicates a slow tail that
-        some visitors feel.
+        When we first set up the performance analytics, they surfaced several
+        small errors. That was very helpful and guided us through fixing them.
+        Now that there are no errors, grading staff might want to inject an
+        error through the console to see the full effect.
       </p>
       <p>
-        <strong>What this means for users (TAs/students):</strong> most
-        assignments open quickly and reliably, so reviewers can get to the
-        content with minimal delay. The few heavier pages are candidates for
-        light tuning so worst-case loads don’t impact grading sessions.
+        This performance section of our analytics dashboard provides an
+        easy-to-read way to track errors and resolve them, giving users a better
+        experience on our site.
       </p>
       <p class="meta">
         <strong>Where to improve:</strong> for the top slow pages, audit images

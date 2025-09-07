@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Detailed Report: Performance</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Reuse your existing libs/renderers -->
+    <script src="https://cdn.zingchart.com/zingchart.min.js" defer></script>
+    <script src="./charts-errors.js" defer></script>
+    <script src="./charts-pages.js" defer></script>
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        margin: 12px;
+        line-height: 1.35;
+        background: #fafafa;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 20px;
+      }
+      .links {
+        margin: 6px 0 10px;
+        font-size: 0.95rem;
+      }
+      .links a {
+        margin-right: 10px;
+      }
+      .qa p {
+        margin: 4px 0;
+      }
+      .meta {
+        font-size: 12px;
+        opacity: 0.75;
+      }
+
+      .wrap {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 10px;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .card {
+        background: #fff;
+        border: 1px dashed rgba(0, 0, 0, 0.12);
+        border-radius: 6px;
+        padding: 10px;
+      }
+      .card h2 {
+        margin: 0 0 6px;
+        font-size: 15px;
+      }
+      .zc {
+        width: 100%;
+        height: 260px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        background: #fff;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 6px;
+        text-align: left;
+      }
+      th {
+        background: rgba(0, 0, 0, 0.05);
+      }
+
+      @media (max-width: 1000px) {
+        .wrap {
+          grid-template-columns: 1fr;
+        }
+        .cards {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Detailed Report: Performance</h1>
+    <div class="links">
+      <a href="./index.html">← Back to Dashboard</a>
+    </div>
+
+    <div class="qa">
+      <p><strong>Question:</strong> How is the performance of my website?</p>
+      <p>
+        <strong>Answer:</strong>
+        Over the last 24h, overall mean load is <span id="ansMean">—</span> ms
+        (p50 <span id="ansP50">—</span> ms, p95 <span id="ansP95">—</span> ms)
+        and total errors are <span id="ansErr">—</span>. The heaviest page by
+        <em>mean</em> among the top offenders is
+        <code id="ansWorstPath">—</code> at ~<span id="ansWorstMs">—</span> ms.
+      </p>
+      <p class="meta">
+        Load time uses <code>/api/performance</code> (<code>total_ms</code> or
+        <code>load_end - nav_start</code>); errors use
+        <code>/api/activity</code> with <code>type="error"</code>. Charts reuse
+        your existing renderers.
+      </p>
+    </div>
+
+    <section class="wrap">
+      <div class="cards">
+        <article class="card">
+          <h2>Errors per Minute (last 24h)</h2>
+          <div id="chartErrors" class="zc" aria-label="Errors per minute"></div>
+          <p class="meta">
+            <strong>Why a line chart?</strong>
+            Errors are time-based events. Plotting rate (errors/min) as a line
+            exposes spikes and trends, supports before/after comparisons (e.g.,
+            a deploy), and smooths second-level noise.
+          </p>
+        </article>
+
+        <article class="card">
+          <h2>Mean Load by Page (Top 5)</h2>
+          <div id="chartPages" class="zc" aria-label="Mean load by page"></div>
+          <p class="meta">
+            <strong>Why a bar chart?</strong>
+            We’re comparing categories (pages). Bars make relative “heaviness”
+            clear and rankable. (This reuses the shared renderer; values here
+            are <em>mean</em> ms.)
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <article class="card" style="margin-top: 10px">
+      <h2>Performance Overview (Top 10 pages)</h2>
+      <table id="perfGrid">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Path</th>
+            <th>Samples</th>
+            <th>Views</th>
+            <th>Mean (ms)</th>
+            <th>Median (ms)</th>
+            <th>p95 (ms)</th>
+            <th>Errors (24h)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p class="meta">
+        <strong>Why a grid?</strong>
+        Exact values and percentiles matter for perf triage. The table shows
+        Samples, Views, Mean, Median, p95, and recent Errors so you can
+        prioritize fixes with hard numbers.
+      </p>
+    </article>
+
+    <article class="card" style="margin-top: 10px">
+      <h2>Discussion</h2>
+      <p>
+        Overall performance is healthy for a homework/portfolio site. The
+        <em>Errors per Minute</em> line stays near zero with no sustained
+        spikes, and central latency (p50) is low. The <em>Mean Load by Page</em>
+        chart highlights a small set of heavier pages; these are typically demos
+        or pages with larger assets. The grid shows per-page samples, p50, and
+        p95: even if mean is acceptable, a high p95 indicates a slow tail that
+        some visitors feel.
+      </p>
+      <p>
+        <strong>What this means for users (TAs/students):</strong> most
+        assignments open quickly and reliably, so reviewers can get to the
+        content with minimal delay. The few heavier pages are candidates for
+        light tuning so worst-case loads don’t impact grading sessions.
+      </p>
+      <p class="meta">
+        <strong>Where to improve:</strong> for the top slow pages, audit images
+        (size/compression), defer non-critical scripts, and cache static assets
+        aggressively. If a page hits external APIs, add simple timing spans so
+        we can see network vs rendering time in the next iteration.
+      </p>
+      <p class="meta">
+        <strong>Limitations:</strong> the dataset is sampled; background tabs
+        inflate some durations; and “mean” can be skewed by outliers—use p50/p95
+        for decisions. Comparing the last 7–14 days would make regressions more
+        visible.
+      </p>
+      <p>
+        <strong>Next steps:</strong> add a daily p50/p95 trend line, annotate
+        deploys, and define simple targets (e.g., p50 &lt; 1000 ms, p95 &lt;
+        3000 ms). If a page exceeds the target for two consecutive days, flag it
+        in the grid.
+      </p>
+    </article>
+
+    <script>
+      // ------- Helpers -------
+      async function j(url) {
+        const r = await fetch(url, { credentials: "include" });
+        const t = await r.text();
+        if (!r.ok)
+          throw new Error(url + " -> " + r.status + "\n" + t.slice(0, 160));
+        try {
+          return JSON.parse(t);
+        } catch {
+          throw new Error(url + " non-JSON:\n" + t.slice(0, 160));
+        }
+      }
+      const arr = (x) =>
+        Array.isArray(x)
+          ? x
+          : x && Array.isArray(x.data)
+          ? x.data
+          : x && Array.isArray(x.rows)
+          ? x.rows
+          : x && Array.isArray(x.result)
+          ? x.result
+          : [];
+      const tsOf = (r) => Number(r.ts || r.timestamp || 0);
+      const minBucket = (ms) => {
+        const d = new Date(Number(ms || Date.now()));
+        d.setSeconds(0, 0);
+        return d.getTime();
+      };
+      function pathOf(r) {
+        let p = r.path || "";
+        if (!p) {
+          const u = r.page_url || r.pageUrl || "";
+          if (u) {
+            try {
+              p = new URL(u).pathname;
+            } catch {}
+          }
+        }
+        return p;
+      }
+      function pctl(a, p) {
+        if (!a.length) return 0;
+        const s = [...a].sort((x, y) => x - y);
+        const i = (p / 100) * (s.length - 1),
+          lo = Math.floor(i),
+          hi = Math.ceil(i);
+        return lo === hi ? s[lo] : s[lo] * (1 - (i - lo)) + s[hi] * (i - lo);
+      }
+      function totalMs(r) {
+        if (r.total_ms != null) return Number(r.total_ms);
+        if (r.totalMs != null) return Number(r.totalMs);
+        if (r.load_end != null && r.nav_start != null)
+          return Number(r.load_end) - Number(r.nav_start);
+        return null;
+      }
+      function fillGrid(rows) {
+        const tb = document.querySelector("#perfGrid tbody");
+        tb.innerHTML = "";
+        rows.forEach((r, i) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td>${r.path}</td>
+          <td>${r.samples}</td>
+          <td>${r.views}</td>
+          <td>${Math.round(r.mean)}</td>
+          <td>${Math.round(r.median)}</td>
+          <td>${Math.round(r.p95)}</td>
+          <td>${r.err24}</td>`;
+          tb.appendChild(tr);
+        });
+      }
+
+      // ------- Main -------
+      (async function () {
+        try {
+          const [statRaw, perfRaw, actRaw] = await Promise.all([
+            j("/api/static?limit=8000"),
+            j("/api/performance?limit=8000"),
+            j("/api/activity?limit=8000"),
+          ]);
+
+          const stat = arr(statRaw),
+            perf = arr(perfRaw),
+            act = arr(actRaw);
+          const dayAgo = Date.now() - 24 * 3600 * 1000;
+
+          // Errors per minute (last 24h)
+          const errRows24 = act.filter(
+            (r) =>
+              String(r.type || "").toLowerCase() === "error" &&
+              tsOf(r) >= dayAgo
+          );
+          const byMin = new Map();
+          for (const r of errRows24) {
+            const m = minBucket(tsOf(r));
+            byMin.set(m, (byMin.get(m) || 0) + 1);
+          }
+          const mins = [...byMin.keys()].sort((a, b) => a - b);
+          const errVals = mins.map((m) => byMin.get(m));
+          renderErrors(
+            mins.map((t) => new Date(t).toLocaleTimeString()),
+            errVals
+          );
+
+          // Load times grouped by path
+          const byPath = new Map(); // path -> array of totals (ms)
+          for (const r of perf) {
+            const p = pathOf(r);
+            const t = totalMs(r);
+            if (!p || t == null || !isFinite(t)) continue;
+            const a = byPath.get(p) || [];
+            a.push(Number(t));
+            byPath.set(p, a);
+          }
+
+          // views per path (for grid context)
+          const viewsByPath = new Map();
+          for (const r of stat) {
+            const p = pathOf(r);
+            if (!p) continue;
+            viewsByPath.set(p, (viewsByPath.get(p) || 0) + 1);
+          }
+
+          // errors per path (24h) for grid
+          const errByPath24 = new Map();
+          for (const r of errRows24) {
+            const p = pathOf(r);
+            if (!p) continue;
+            errByPath24.set(p, (errByPath24.get(p) || 0) + 1);
+          }
+
+          // per-path metrics
+          const rows = [...byPath.entries()].map(([path, arrMs]) => {
+            const mean = arrMs.reduce((s, v) => s + v, 0) / arrMs.length;
+            const median = pctl(arrMs, 50);
+            const p95v = pctl(arrMs, 95);
+            return {
+              path,
+              samples: arrMs.length,
+              mean,
+              median,
+              p95: p95v,
+              views: viewsByPath.get(path) || 0,
+              err24: errByPath24.get(path) || 0,
+            };
+          });
+
+          // Chart: Mean load by page (Top 5) using your renderPages
+          const topMean = rows
+            .filter((r) => r.samples >= 2) // optional noise filter
+            .sort((a, b) => b.mean - a.mean)
+            .slice(0, 5);
+          renderPages(
+            topMean.map((r) => r.path),
+            topMean.map((r) => Math.round(r.mean))
+          );
+
+          // Grid: Top 10 by views (then mean)
+          const topGrid = rows
+            .sort((a, b) => b.views - a.views || b.mean - a.mean)
+            .slice(0, 10);
+          fillGrid(topGrid);
+
+          // Answer summary
+          const allTotals = [].concat(...[...byPath.values()]);
+          const overallMean = allTotals.length
+            ? allTotals.reduce((s, v) => s + v, 0) / allTotals.length
+            : 0;
+          const overallP50 = pctl(allTotals, 50);
+          const overallP95 = pctl(allTotals, 95);
+          const totalErr24 = errRows24.length;
+          const worst = topMean[0];
+
+          document.getElementById("ansMean").textContent =
+            Math.round(overallMean);
+          document.getElementById("ansP50").textContent =
+            Math.round(overallP50);
+          document.getElementById("ansP95").textContent =
+            Math.round(overallP95);
+          document.getElementById("ansErr").textContent = totalErr24;
+          if (worst) {
+            document.getElementById("ansWorstPath").textContent = worst.path;
+            document.getElementById("ansWorstMs").textContent = Math.round(
+              worst.mean
+            );
+          }
+        } catch (e) {
+          console.error(e);
+          document.getElementById("ansMean").textContent = "—";
+          document.getElementById("ansP50").textContent = "—";
+          document.getElementById("ansP95").textContent = "—";
+          document.getElementById("ansErr").textContent = "—";
+        }
+      })();
+    </script>
+  </body>
+</html>

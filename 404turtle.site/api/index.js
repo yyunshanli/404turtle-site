@@ -1,387 +1,491 @@
-// assets/collector.js
+// /var/www/404turtle.site/api/index.js
+const express = require("express");
+const pool = require("./db.cjs");
 
-// Config
-const Q_KEY = "collector_queue_v1";
-const SID_KEY = "collector_sid";
-const MAX_QUEUE = 10000;
-const RETRY_MS = 4000;
+const app = express();
 
-const API_STATIC = "/api/static";
-const API_PERF = "/api/performance";
-const API_ACTIVITY = "/api/activity";
+// ---------- core middleware ----------
+app.use(express.json({ limit: "1mb" }));
+app.set("etag", false);
 
-// Small helpers
-function genId() {
-  return Math.random().toString(36).slice(2) + Date.now();
-}
-
-function throttle(fn, ms) {
-  let last = 0;
-  return (...args) => {
-    const now = Date.now();
-    if (now - last >= ms) {
-      last = now;
-      fn(...args);
-    }
-  };
-}
-
-function base(extra = {}) {
-  return {
-    sessionId,
-    timestamp: Date.now(),
-    pageUrl: location.href,
-    path: location.pathname,
-    referrer: document.referrer || "",
-    ...extra,
-  };
-}
-
-// Queue
-let _q = [];
-function _loadQ() {
-  try {
-    _q = JSON.parse(localStorage.getItem(Q_KEY) || "[]");
-  } catch {
-    _q = [];
+// CORS (allow dashboard origins)
+const ALLOWED = new Set([
+  "https://404turtle.site",
+  "https://www.404turtle.site",
+]);
+app.use((req, res, next) => {
+  const origin = req.get("Origin");
+  if (origin && ALLOWED.has(origin)) {
+    res.set("Access-Control-Allow-Origin", origin);
+    res.set("Vary", "Origin");
+    res.set("Access-Control-Allow-Credentials", "true");
+    res.set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+    res.set("Access-Control-Expose-Headers", "Location, X-Total-Count");
+    if (req.method === "OPTIONS") return res.sendStatus(204);
   }
-}
-function _saveQ() {
-  try {
-    localStorage.setItem(Q_KEY, JSON.stringify(_q));
-  } catch {}
-}
-function _enqueue(env) {
-  if (_q.length >= MAX_QUEUE) _q.shift();
-  _q.push(env);
-  _saveQ();
-}
-_loadQ();
+  next();
+});
 
-// Try to send a single queued envelope
-async function _trySendOne() {
-  if (!_q.length || !navigator.onLine) return;
-  const env = _q.shift();
-  _saveQ();
+// no-store for API + light access log for /activity
+app.use((req, res, next) => {
+  if (req.path.startsWith("/activity")) {
+    console.log("HIT", req.method, req.originalUrl);
+  }
+  res.set("Cache-Control", "no-store");
+  next();
+});
 
-  const body = JSON.stringify(env.payload);
-
-  try {
-    if (document.visibilityState === "hidden" && navigator.sendBeacon) {
-      const ok = navigator.sendBeacon(
-        env.__endpoint,
-        new Blob([body], { type: "application/json" })
-      );
-      if (!ok) throw new Error("sendBeacon failed");
-      return;
+// ---------- helpers ----------
+app.get("/_routes", (req, res) => {
+  const routes = [];
+  app._router.stack.forEach((m) => {
+    if (m.route && m.route.path) {
+      routes.push({ methods: m.route.methods, path: m.route.path });
     }
-    const resp = await fetch(env.__endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-      keepalive: true,
-      credentials: "include",
-    });
-    if (!resp.ok) throw new Error("HTTP " + resp.status);
+  });
+  res.json(routes);
+});
+
+app.get("/_perfcheck", async (req, res, next) => {
+  try {
+    const [rows] = await pool.query("SELECT COUNT(*) AS n FROM performance");
+    res.json(rows[0]);
   } catch (e) {
-    // Put it back to the front and try again later
-    _q.unshift(env);
-    _saveQ();
-    throw e;
+    next(e);
   }
-}
-
-let _retryTimer = null;
-function _scheduleRetry() {
-  if (_retryTimer) return;
-  _retryTimer = setInterval(async () => {
-    if (!_q.length) return;
-    try {
-      await _trySendOne();
-    } catch {
-      /* keep trying */
-    }
-  }, RETRY_MS);
-}
-_scheduleRetry();
-
-addEventListener("online", () => _trySendOne());
-addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") _trySendOne();
 });
 
-addEventListener("pagehide", () => {
-  if (!_q.length || !navigator.sendBeacon) return;
-  for (const env of _q) {
-    const body = new Blob([JSON.stringify(env.payload)], {
-      type: "application/json",
-    });
-    navigator.sendBeacon(env.__endpoint, body);
-  }
-  _q = [];
-  _saveQ();
-});
+app.get("/health", (req, res) => res.json({ ok: true }));
 
-// Session id
-let sessionId =
-  localStorage.getItem(SID_KEY) ||
-  (localStorage.setItem(SID_KEY, genId()), localStorage.getItem(SID_KEY));
-
-// Sender
-async function postJSON(endpoint, payload) {
-  const env = { __endpoint: endpoint, payload };
-
-  if (!navigator.onLine) {
-    _enqueue(env);
-    return;
-  }
-
+// ---------- STATIC ----------
+app.get("/static", async (req, res, next) => {
   try {
-    await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      keepalive: true,
-      credentials: "include",
-    });
-  } catch {
-    _enqueue(env);
-    _scheduleRetry();
-  }
-}
-
-// Feature detection
-function detectImagesEnabled() {
-  return new Promise((resolve) => {
-    const img = new Image();
-    let done = false;
-    img.onload = () => {
-      if (!done) {
-        done = true;
-        resolve(true);
-      }
-    };
-    img.onerror = () => {
-      if (!done) {
-        done = true;
-        resolve(false);
-      }
-    };
-    img.src =
-      "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
-    setTimeout(() => {
-      if (!done) resolve(true);
-    }, 300);
-  });
-}
-function detectCssEnabled() {
-  try {
-    const el = document.createElement("div");
-    el.style.position = "absolute";
-    el.style.left = "-9999px";
-    el.style.width = "10px";
-    document.body.appendChild(el);
-    const w = parseInt(getComputedStyle(el).width || "0", 10);
-    el.remove();
-    return w === 10;
-  } catch {
-    return null;
-  }
-}
-
-// Performance block
-function getPerformanceBlock() {
-  try {
-    const nav = performance.getEntriesByType?.("navigation")?.[0];
-    if (nav?.toJSON) {
-      const raw = nav.toJSON();
-      const startRel = raw.startTime || 0;
-      let endRel =
-        raw.loadEventEnd ||
-        raw.domComplete ||
-        raw.responseEnd ||
-        raw.duration ||
-        0;
-      if (!endRel || endRel <= startRel) endRel = performance.now();
-      const start = Math.round(performance.timeOrigin + startRel); // epoch ms
-      const end = Math.round(performance.timeOrigin + endRel);
-      const totalMs = Math.max(0, Math.round(endRel - startRel));
-      return { raw, start, end, totalMs };
-    }
-  } catch {}
-  return {};
-}
-
-// Activity events
-function sendEvent(type, extra = {}) {
-  postJSON(API_ACTIVITY, base({ type, ...extra }));
-}
-
-// Idle detection
-const IDLE_MS = 2000;
-let lastActivity = Date.now();
-let idleStart = null;
-
-function markActivity() {
-  const now = Date.now();
-  if (idleStart && now - idleStart >= IDLE_MS) {
-    sendEvent("idle", { endedAt: now, durationMs: now - idleStart });
-  }
-  idleStart = null;
-  lastActivity = now;
-}
-
-setInterval(() => {
-  if (!idleStart && Date.now() - lastActivity >= IDLE_MS) {
-    idleStart = lastActivity + IDLE_MS;
-  }
-}, 500);
-
-// Error listeners
-addEventListener("error", (e) => {
-  sendEvent("error", {
-    error: {
-      message: e.message || "",
-      source: e.filename || "",
-      lineno: e.lineno || null,
-      colno: e.colno || null,
-    },
-  });
-});
-addEventListener("unhandledrejection", (e) => {
-  sendEvent("error", {
-    error: { message: String(e?.reason || "unhandledrejection") },
-  });
-});
-
-// Mouse / click / scroll
-document.addEventListener(
-  "mousemove",
-  throttle((e) => {
-    sendEvent("mousemove", { x: e.clientX, y: e.clientY });
-    markActivity();
-  }, 100)
-);
-document.addEventListener(
-  "click",
-  (e) => {
-    sendEvent("click", { button: e.button, x: e.clientX, y: e.clientY });
-    markActivity();
-  },
-  true
-);
-document.addEventListener(
-  "scroll",
-  throttle(() => {
-    sendEvent("scroll", { x: window.scrollX, y: window.scrollY });
-    markActivity();
-  }, 200),
-  { passive: true }
-);
-
-// Keyboard
-addEventListener(
-  "keydown",
-  (e) => {
-    sendEvent("key", { phase: "down", key: e.key, code: e.code });
-    markActivity();
-  },
-  { passive: true }
-);
-addEventListener(
-  "keyup",
-  (e) => {
-    sendEvent("key", { phase: "up", key: e.key, code: e.code });
-    markActivity();
-  },
-  { passive: true }
-);
-
-// Visibility change
-addEventListener("visibilitychange", () => {
-  _trySendOne();
-});
-
-// Page enter / leave
-sendEvent("enter");
-
-addEventListener("beforeunload", () => {
-  const now = Date.now();
-  const payloads = [];
-
-  if (idleStart && now - idleStart >= IDLE_MS) {
-    payloads.push(
-      base({ type: "idle", endedAt: now, durationMs: now - idleStart })
+    const limit = Math.min(Number(req.query.limit || 1000), 5000);
+    const offset = Number(req.query.offset || 0);
+    const [rows] = await pool.query(
+      "SELECT * FROM static ORDER BY id DESC LIMIT ? OFFSET ?",
+      [limit, offset]
     );
-  }
-  payloads.push(base({ type: "leave" }));
-
-  if (navigator.sendBeacon) {
-    for (const p of payloads) {
-      const body = new Blob([JSON.stringify(p)], { type: "application/json" });
-      navigator.sendBeacon(API_ACTIVITY, body);
-    }
-  } else {
-    for (const p of payloads) postJSON(API_ACTIVITY, p);
+    res.json(rows);
+  } catch (e) {
+    next(e);
   }
 });
 
-// Boot
-function boot() {
-  const onLoad = async () => {
-    try {
-      const staticSync = getStaticSync();
-      const [imagesEnabled, cssEnabled] = await Promise.all([
-        detectImagesEnabled(),
-        Promise.resolve(detectCssEnabled()),
-      ]);
-      const performance = getPerformanceBlock();
+app.get("/static/:id", async (req, res, next) => {
+  try {
+    const [rows] = await pool.query("SELECT * FROM static WHERE id = ?", [
+      req.params.id,
+    ]);
+    if (!rows.length) return res.sendStatus(404);
+    res.json(rows[0]);
+  } catch (e) {
+    next(e);
+  }
+});
 
-      // Performance row
-      const perfRow = base({
-        type: "performance",
-        navStart: performance.start ?? null,
-        loadEnd: performance.end ?? null,
-        totalMs: performance.totalMs ?? null,
-        raw: performance.raw || null,
-      });
-      await postJSON(API_PERF, perfRow);
+app.post("/static", async (req, res, next) => {
+  try {
+    // accept either a flat row or { static: {...} }
+    const s = req.body.static ? { ...req.body, ...req.body.static } : req.body;
+    const params = [
+      s.sessionId,
+      s.pageUrl,
+      s.path,
+      s.referrer || "",
+      s.timestamp,
+      s.userAgent,
+      s.language,
+      s.cookiesEnabled,
+      s.jsEnabled,
+      s.imagesEnabled,
+      s.cssEnabled,
+      s.screen?.w,
+      s.screen?.h,
+      s.viewport?.w,
+      s.viewport?.h,
+      s.networkType,
+    ];
+    const [r] = await pool.query(
+      `INSERT INTO static
+       (session_id, page_url, path, referrer, ts, user_agent, language,
+        cookies_enabled, js_enabled, images_enabled, css_enabled,
+        screen_w, screen_h, viewport_w, viewport_h, network_type)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      params
+    );
+    res.set("Location", `/api/static/${r.insertId}`);
+    res.status(201).json({ id: r.insertId, ...req.body });
+  } catch (e) {
+    next(e);
+  }
+});
 
-      // Static row
-      const staticRow = base({
-        type: "static",
-        userAgent: staticSync.userAgent,
-        language: staticSync.language,
-        cookiesEnabled: staticSync.cookiesEnabled,
-        jsEnabled: true,
-        imagesEnabled,
-        cssEnabled,
-        screen: staticSync.screen,
-        viewport: staticSync.viewport,
-        networkType: staticSync.networkType,
-      });
-      await postJSON(API_STATIC, staticRow);
+app.put("/static/:id", async (req, res, next) => {
+  try {
+    const s = req.body;
+    const [r] = await pool.query(
+      `UPDATE static SET
+        session_id=?, page_url=?, path=?, referrer=?, ts=?, user_agent=?, language=?,
+        cookies_enabled=?, js_enabled=?, images_enabled=?, css_enabled=?,
+        screen_w=?, screen_h=?, viewport_w=?, viewport_h=?, network_type=?
+       WHERE id=?`,
+      [
+        s.sessionId,
+        s.pageUrl,
+        s.path,
+        s.referrer || "",
+        s.timestamp,
+        s.userAgent,
+        s.language,
+        s.cookiesEnabled,
+        s.jsEnabled,
+        s.imagesEnabled,
+        s.cssEnabled,
+        s.screen?.w,
+        s.screen?.h,
+        s.viewport?.w,
+        s.viewport?.h,
+        s.networkType,
+        req.params.id,
+      ]
+    );
+    if (!r.affectedRows) return res.sendStatus(404);
+    const [rows] = await pool.query("SELECT * FROM static WHERE id=?", [
+      req.params.id,
+    ]);
+    res.json(rows[0]);
+  } catch (e) {
+    next(e);
+  }
+});
 
-      console.log("collector sessionId:", sessionId);
-    } catch (e) {
-      console.warn("collector boot error:", e);
+app.delete("/static/:id", async (req, res, next) => {
+  try {
+    const [r] = await pool.query("DELETE FROM static WHERE id = ?", [
+      req.params.id,
+    ]);
+    res.sendStatus(r.affectedRows ? 204 : 404);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---------- PERFORMANCE ----------
+app.get("/performance", async (req, res, next) => {
+  try {
+    const limit = Math.min(Number(req.query.limit || 1000), 5000);
+    const offset = Number(req.query.offset || 0);
+    const [rows] = await pool.query(
+      "SELECT * FROM performance ORDER BY id DESC LIMIT ? OFFSET ?",
+      [limit, offset]
+    );
+    res.json(rows);
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.get("/performance/:id", async (req, res, next) => {
+  try {
+    const [rows] = await pool.query("SELECT * FROM performance WHERE id = ?", [
+      req.params.id,
+    ]);
+    if (!rows.length) return res.sendStatus(404);
+    res.json(rows[0]);
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.post("/performance", async (req, res, next) => {
+  try {
+    const b = req.body.performance
+      ? { ...req.body, ...req.body.performance }
+      : req.body;
+    const sessionId = b.sessionId;
+    const ts = b.timestamp;
+    const navStart = b.navStart ?? b.navigationStart ?? b.start ?? null;
+    const loadEnd = b.loadEnd ?? b.end ?? null;
+    const totalMs = b.totalMs ?? null;
+    const raw = b.raw ? JSON.stringify(b.raw) : null;
+
+    const [r] = await pool.query(
+      `INSERT INTO performance
+       (session_id, page_url, path, ts, nav_start, load_end, total_ms, raw)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [sessionId, b.pageUrl, b.path, ts, navStart, loadEnd, totalMs, raw]
+    );
+    res.set("Location", `/api/performance/${r.insertId}`);
+    res.status(201).json({ id: r.insertId, ...req.body });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.put("/performance/:id", async (req, res, next) => {
+  try {
+    const b = req.body.performance
+      ? { ...req.body, ...req.body.performance }
+      : req.body;
+    const [r] = await pool.query(
+      `UPDATE performance SET
+        session_id=?, page_url=?, path=?, ts=?, nav_start=?, load_end=?, total_ms=?, raw=?
+       WHERE id=?`,
+      [
+        b.sessionId,
+        b.pageUrl,
+        b.path,
+        b.timestamp,
+        b.navStart ?? b.navigationStart ?? b.start ?? null,
+        b.loadEnd ?? b.end ?? null,
+        b.totalMs ?? null,
+        b.raw ? JSON.stringify(b.raw) : null,
+        req.params.id,
+      ]
+    );
+    if (!r.affectedRows) return res.sendStatus(404);
+    const [rows] = await pool.query("SELECT * FROM performance WHERE id=?", [
+      req.params.id,
+    ]);
+    res.json(rows[0]);
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.delete("/performance/:id", async (req, res, next) => {
+  try {
+    const [r] = await pool.query("DELETE FROM performance WHERE id=?", [
+      req.params.id,
+    ]);
+    res.sendStatus(r.affectedRows ? 204 : 404);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---------- Activity helpers (normalize + clamp) ----------
+const toInt = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.round(n) : null;
+};
+
+// IMPORTANT: Make sure your DB enum includes 'pageview'.
+// ALTER TABLE `activity` MODIFY COLUMN `type` ENUM('enter','leave','mousemove','click','scroll','key','idle','error','pageview') NOT NULL;
+const TYPE_OK = new Set([
+  "enter",
+  "leave",
+  "mousemove",
+  "scroll",
+  "click",
+  "key",
+  "error",
+  "idle",
+  "pageview",
+]);
+
+function normalizeType(tRaw) {
+  const t = String(tRaw || "").toLowerCase();
+  if (TYPE_OK.has(t)) return t;
+  if (t === "pagehide" || t === "page-hide" || t === "page_hide")
+    return "leave";
+  if (t === "view" || t === "pv" || t === "page-view" || t === "page_view")
+    return "pageview";
+  return "enter";
+}
+
+// ---------- ACTIVITY ----------
+app.get("/activity", async (req, res, next) => {
+  try {
+    const limit = Math.min(
+      parseInt(
+        req.query["page-size"] || req.query.pageSize || req.query.limit || 50,
+        10
+      ),
+      500
+    );
+    const page = Math.max(parseInt(req.query.page || 1, 10), 1);
+    const offset = (page - 1) * limit;
+
+    const noMoves = ["1", "true", "yes", "on"].includes(
+      String(req.query.noMoves ?? "0").toLowerCase()
+    );
+    const type = req.query.type;
+
+    const where = [];
+    const params = [];
+    if (noMoves) where.push("type <> 'mousemove'");
+    if (type) {
+      where.push("type = ?");
+      params.push(type);
     }
-  };
+    const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-  if (document.readyState === "complete") onLoad();
-  else addEventListener("load", onLoad, { once: true });
-}
+    const [[{ c }]] = await pool.query(
+      `SELECT COUNT(*) c FROM activity ${whereSQL}`,
+      params
+    );
+    res.set("X-Total-Count", String(c));
+    res.set("Access-Control-Expose-Headers", "X-Total-Count");
 
-function getStaticSync() {
-  return {
-    userAgent: navigator.userAgent || "",
-    language: navigator.language || "",
-    cookiesEnabled: navigator.cookieEnabled ?? null,
-    jsEnabled: true,
-    screen: { w: screen?.width ?? null, h: screen?.height ?? null },
-    viewport: { w: window.innerWidth, h: window.innerHeight },
-    networkType: navigator.connection?.effectiveType || null,
-  };
-}
+    const [rows] = await pool.query(
+      `SELECT * FROM activity ${whereSQL} ORDER BY id DESC LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+    res.json(rows);
+  } catch (e) {
+    next(e);
+  }
+});
 
-boot();
+app.get("/activity/:id", async (req, res, next) => {
+  try {
+    const [rows] = await pool.query("SELECT * FROM activity WHERE id = ?", [
+      req.params.id,
+    ]);
+    if (!rows.length) return res.sendStatus(404);
+    res.json(rows[0]);
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.post("/activity", async (req, res, next) => {
+  try {
+    const a = req.body || {};
+
+    const sessionId = String(a.sessionId || "");
+    const ts = toInt(a.timestamp) || Date.now();
+    const pageUrl = String(a.pageUrl || "").slice(0, 2048);
+
+    let path = String(a.path || "");
+    if (!path && pageUrl) {
+      try {
+        path = new URL(pageUrl).pathname;
+      } catch {}
+    }
+    path = path.slice(0, 512); // match schema: VARCHAR(512)
+
+    const type = normalizeType(a.type);
+    const x = toInt(a.x ?? a.clientX ?? a.pageX);
+    const y = toInt(a.y ?? a.clientY ?? a.pageY);
+    const button = toInt(a.button);
+    let keyCode = a.code ?? a.key ?? null;
+    keyCode = keyCode == null ? null : String(keyCode).slice(0, 64); // VARCHAR(64)
+    const scrollX = toInt(
+      a.scroll_x ?? a.scrollX ?? (type === "scroll" ? a.x : null)
+    );
+    const scrollY = toInt(
+      a.scroll_y ?? a.scrollY ?? (type === "scroll" ? a.y : null)
+    );
+    const durationMs = toInt(a.durationMs ?? a.duration_ms);
+    const err = a.error ? JSON.stringify(a.error).slice(0, 4000) : null;
+
+    const [r] = await pool.query(
+      `INSERT INTO activity
+       (session_id, page_url, path, ts, type, x, y, button, key_code, scroll_x, scroll_y, duration_ms, error)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        sessionId,
+        pageUrl,
+        path,
+        ts,
+        type,
+        x,
+        y,
+        button,
+        keyCode,
+        scrollX,
+        scrollY,
+        durationMs,
+        err,
+      ]
+    );
+
+    res.set("Location", `/api/activity/${r.insertId}`);
+    res.status(201).json({ id: r.insertId });
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.put("/activity/:id", async (req, res, next) => {
+  try {
+    const a = req.body || {};
+
+    const sessionId = String(a.sessionId || "");
+    const ts = toInt(a.timestamp) || Date.now();
+    const pageUrl = String(a.pageUrl || "").slice(0, 2048);
+
+    let path = String(a.path || "");
+    if (!path && pageUrl) {
+      try {
+        path = new URL(pageUrl).pathname;
+      } catch {}
+    }
+    path = path.slice(0, 512);
+
+    const type = normalizeType(a.type);
+    const x = toInt(a.x ?? a.clientX ?? a.pageX);
+    const y = toInt(a.y ?? a.clientY ?? a.pageY);
+    const button = toInt(a.button);
+    let keyCode = a.code ?? a.key ?? null;
+    keyCode = keyCode == null ? null : String(keyCode).slice(0, 64);
+    const scrollX = toInt(a.scroll_x ?? a.scrollX);
+    const scrollY = toInt(a.scroll_y ?? a.scrollY);
+    const durationMs = toInt(a.durationMs ?? a.duration_ms);
+    const err = a.error ? JSON.stringify(a.error).slice(0, 4000) : null;
+
+    const [r] = await pool.query(
+      `UPDATE activity SET
+        session_id=?, page_url=?, path=?, ts=?, type=?, x=?, y=?, button=?, key_code=?, scroll_x=?, scroll_y=?, duration_ms=?, error=?
+       WHERE id=?`,
+      [
+        sessionId,
+        pageUrl,
+        path,
+        ts,
+        type,
+        x,
+        y,
+        button,
+        keyCode,
+        scrollX,
+        scrollY,
+        durationMs,
+        err,
+        req.params.id,
+      ]
+    );
+    if (!r.affectedRows) return res.sendStatus(404);
+
+    const [rows] = await pool.query("SELECT * FROM activity WHERE id=?", [
+      req.params.id,
+    ]);
+    res.json(rows[0]);
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.delete("/activity/:id", async (req, res, next) => {
+  try {
+    const [r] = await pool.query("DELETE FROM activity WHERE id=?", [
+      req.params.id,
+    ]);
+    res.sendStatus(r.affectedRows ? 204 : 404);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---------- error handler ----------
+app.use((err, req, res, next) => {
+  console.error("API error:", err);
+  res.status(500).json({ error: err.code || "ERR", message: err.message });
+});
+
+// ---------- start ----------
+app.listen(4000, () => console.log("API listening on :4000"));

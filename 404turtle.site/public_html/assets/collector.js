@@ -4,11 +4,12 @@ const MAX_QUEUE = 10000;
 const RETRY_MS = 4000;
 
 // endpoints (reads + writes)
-const API_STATIC = "/api/static";
-const API_PERF = "/api/performance";
-const API_ACTIVITY = "/api/activity";
+const API_ORIGIN = "https://reporting.404turtle.site";
+const API_STATIC = `${API_ORIGIN}/api/static`;
+const API_PERF = `${API_ORIGIN}/api/performance`;
+const API_ACTIVITY = `${API_ORIGIN}/api/activity`;
 
-// unified activity ingest endpoint (overrideable from HTML if needed)
+// unified activity ingest endpoint
 const EVENTS_ENDPOINT = window.COLLECTOR_ENDPOINT || API_ACTIVITY;
 
 let _q = [];

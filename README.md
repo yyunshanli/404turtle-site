@@ -23,6 +23,39 @@ password: frogfrog
 # link to site
 https://404turtle.site/
 
+# Dashboard
+We built the dashboard around two simple goals: see what users do and see if the site feels healthy/fast while they do it. The page has a quick stats bar on top and the charts underneath.
+
+## Stats bar
+Up top we show Sessions, Pageviews (24h), Unique Pages, Errors (24h), and Median Load (ms). They’re kept as numbers on purpose to be easy to glance at. The 24-hour window keeps the activity numbers fresh, and using the median for load keeps weird outliers from messing it up.
+
+# Charts: what we picked and why
+
+## Errors per Minute — line chart
+
+Here we count how many error events happen each minute and draw that as a line over time. Using “per minute” normalizes the rate for busy and quiet periods. The line also makes spikes jump out fast. It’s easy to line up a spike with something that happened (a deploy, a busy hour), and the timestamps make it useful when you’re digging into logs later. We tried fancier versions (stacked by type, heatmaps), but they were harder to read at a glance, so we kept it clean.
+
+## Median Load by Page (Top 5) — bar chart
+
+For performance, we look at the “typical” load time for each page and show just the worst five. We use the median on purpose so one weird, super-slow visit doesn’t sway the result. Bars are good here because you just want to see which pages are slower than the others without thinking too hard. We considered box plots to show spread, but that felt like overkill for a dashboard you skim.
+
+## Session Duration Distribution (last 24h) — horizontal bars
+
+This one groups sessions by how long they lasted in simple ranges: 0–10s, 10–30s, 30–60s, 1–3m, and so on. Ranges are easier to understand than exact seconds, and the horizontal layout keeps the labels readable. While the report is not perfect, as people leave tabs open and sessions can include a few visits, it’s great for seeing if most people bounce right away or actually hang around.
+
+## Top Landing Pages (all-time) — bar chart
+
+For each session, we grab the first page the person saw and count those up. That tells us where people are arriving from and which pages need to be made extra well because they make the first impression. We keep this “all-time” (within what we’ve loaded) so we can see a persistent trend, and bars keep the comparison straightforward. The motivation for this chart is learning about the site navigation, where there are entry points to the site and exit points.
+
+## Top Exit Pages (all-time) — bar chart
+
+Same idea as landings, but for the last page someone saw. If a page shows up here a lot, it might be a dead end… or it might be the place where people finish what they came to do. Reading this together with the duration chart helps: lots of exits plus lots of very short sessions usually mean a bounce; lots of exits after longer sessions can mean “mission accomplished.”
+
+## Traffic Share by Page — donut with “Other”
+
+This shows how the total pageviews are split across pages. We limit it to the top handful and roll the tiny ones into “Other” so the donut doesn’t turn hard to read. Each slice is labeled with a percent, so you don’t have to guess. We tried other shapes (stacked bars), but at this small size, the donut communicates “who’s biggest” the fastest.
+
+
 # Homework 1
 ## Details of Github auto deploy setup
 This deployment process uses Git hooks.  

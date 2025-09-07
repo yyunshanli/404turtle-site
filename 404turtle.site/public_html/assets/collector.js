@@ -3,11 +3,13 @@ const Q_KEY = "collector_queue_v1";
 const MAX_QUEUE = 10000;
 const RETRY_MS = 4000;
 
-// endpoints
+// endpoints (reads + writes)
 const API_STATIC = "/api/static";
 const API_PERF = "/api/performance";
 const API_ACTIVITY = "/api/activity";
-const MOCK_EVENTS = "/json/events";
+
+// unified activity ingest endpoint (overrideable from HTML if needed)
+const EVENTS_ENDPOINT = window.COLLECTOR_ENDPOINT || API_ACTIVITY;
 
 let _q = [];
 function _loadQ() {
@@ -23,7 +25,6 @@ function _saveQ() {
   } catch {}
 }
 function _enqueue(item) {
-  // drop oldest
   if (_q.length >= MAX_QUEUE) _q.shift();
   _q.push(item);
   _saveQ();
@@ -75,12 +76,13 @@ function _scheduleRetry() {
 }
 _scheduleRetry();
 
-// Retry when come back online
+// Retry when come back online / visible
 addEventListener("online", () => _trySendOne());
 addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") _trySendOne();
 });
 
+// Flush everything on pagehide with sendBeacon when possible
 addEventListener("pagehide", () => {
   if (!_q.length || !navigator.sendBeacon) return;
   for (const env of _q) {
@@ -104,17 +106,16 @@ let sessionId =
 
 // tiny sender
 async function postJSON(path, payload) {
-  const env = { __endpoint: path, payload }; // envelope kept only locally
+  const env = { __endpoint: path, payload };
   if (!navigator.onLine) {
     _enqueue(env);
     return;
   }
-
   try {
     await fetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload), // <-- send payload only
+      body: JSON.stringify(payload),
       keepalive: true,
     });
   } catch {
@@ -207,7 +208,7 @@ function getPerformanceBlock() {
         raw.duration ||
         0;
       if (!endRel || endRel <= startRel) endRel = performance.now();
-      const start = Math.round(performance.timeOrigin + startRel); // ms since epoch
+      const start = Math.round(performance.timeOrigin + startRel);
       const end = Math.round(performance.timeOrigin + endRel);
       const totalMs = Math.max(0, Math.round(endRel - startRel));
       return { raw, start, end, totalMs };
@@ -218,7 +219,8 @@ function getPerformanceBlock() {
 
 // -------- ACTIVITY --------
 function sendEvent(type, extra) {
-  postJSON(API_ACTIVITY, base({ type, ...extra }));
+  // all activity goes to EVENTS_ENDPOINT (defaults to /api/activity)
+  postJSON(EVENTS_ENDPOINT, base({ type, ...extra }));
 }
 
 // idle ≥ 2s
@@ -300,11 +302,8 @@ window.addEventListener(
 );
 
 window.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "hidden") {
-    _trySendOne();
-  } else if (document.visibilityState === "visible") {
-    _trySendOne();
-  }
+  if (document.visibilityState === "hidden") _trySendOne();
+  else if (document.visibilityState === "visible") _trySendOne();
 });
 
 // entered + leaving page
@@ -312,12 +311,9 @@ sendEvent("enter");
 window.addEventListener("beforeunload", () => {
   const now = Date.now();
   if (idleStart && now - idleStart >= IDLE_MS) {
-    postJSON(
-      "/json/events",
-      base({ type: "idle", endedAt: now, durationMs: now - idleStart })
-    );
+    sendEvent("idle", { endedAt: now, durationMs: now - idleStart });
   }
-  postJSON("/json/events", base({ type: "leave" }));
+  sendEvent("leave");
 });
 
 // -------- BOOT --------
@@ -330,15 +326,13 @@ function boot() {
     ]);
     const performance = getPerformanceBlock();
 
-    // one combined POST: static + performance
-    await postJSON(
-      MOCK_EVENTS,
-      base({
-        type: "pageview",
-        static: { ...staticSync, imagesEnabled, cssEnabled },
-        performance,
-      })
-    );
+    // One combined pageview activity
+    sendEvent("pageview", {
+      static: { ...staticSync, imagesEnabled, cssEnabled },
+      performance,
+    });
+
+    // Performance table row
     const perfRow = base({
       type: "performance",
       navStart: performance.start ?? null,
@@ -348,6 +342,7 @@ function boot() {
     });
     await postJSON(API_PERF, perfRow);
 
+    // Static table row
     const staticRow = base({
       type: "static",
       userAgent: staticSync.userAgent,

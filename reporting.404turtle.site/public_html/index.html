@@ -1,19 +1,513 @@
 <!DOCTYPE html>
 <html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>CSE135 · Reporting Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="/assets/collector.js" defer></script>
+    <script src="https://cdn.zingchart.com/zingchart.min.js" defer></script>
 
-<head>
-  <meta charset="UTF-8" >
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" >
-  <title>CSE 135 HW Lives!</title>
-</head>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        margin: 12px;
+        line-height: 1.3;
+        background: #fafafa;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 18px;
+      }
+      .links {
+        margin: 6px 0 10px;
+        font-size: 0.9rem;
+      }
+      .links a {
+        margin-right: 10px;
+      }
 
-<body>
-  <h1>CSE 135 HW1 Lives!</h1>
-  <h2>reporting.404turtle.site</h2>
-  <script>
-    document.write(`Live @ ${new Date()}`);
-  </script>
+      /* stats */
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(120px, 1fr));
+        gap: 8px;
+        margin: 8px 0 12px;
+      }
+      .stat {
+        border: 2px dashed rgba(0, 0, 0, 0.06);
+        padding: 8px;
+        border-radius: 6px;
+        background: #fff;
+      }
+      .stat .l {
+        font-size: 12px;
+        opacity: 0.8;
+      }
+      .stat .v {
+        font-size: 18px;
+        font-variant-numeric: tabular-nums;
+      }
 
-</body>
+      .charts {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 8px;
+      }
+      .chart {
+        border: 2px dashed rgba(0, 0, 0, 0.06);
+        padding: 8px;
+        border-radius: 6px;
+        background: #fff;
+      }
+      .chart h2 {
+        margin: 0 0 6px;
+        font-size: 14px;
+      }
+      .zc {
+        width: 100%;
+        height: 220px;
+      }
 
+      .grid {
+        margin-top: 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        background: #fff;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 6px;
+        vertical-align: top;
+      }
+      th {
+        background: rgba(0, 0, 0, 0.05);
+      }
+
+      @media (max-width: 900px) {
+        .charts {
+          grid-template-columns: 1fr;
+        }
+        .stats {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+    </style>
+
+    <!-- chart renderers -->
+    <script src="./charts-errors.js" defer></script>
+    <script src="./charts-pages.js" defer></script>
+    <script src="./charts-sessdur.js" defer></script>
+    <script src="./charts-landing.js" defer></script>
+    <script src="./charts-exit.js" defer></script>
+    <script src="./charts-traffic-share.js" defer></script>
+  </head>
+  <body>
+    <h1>CSE135 Reporting Dashboard</h1>
+    <div class="links">
+      <a href="./slow-pages.html">Detailed Report: Slow Pages</a>
+      <a href="/api/static?limit=50" target="_blank">static.json</a>
+      <a href="/api/performance?limit=50" target="_blank">performance.json</a>
+      <a href="/api/activity?limit=50" target="_blank">activity.json</a>
+    </div>
+
+    <!-- Stats -->
+    <section class="stats">
+      <div class="stat">
+        <div class="l">Sessions</div>
+        <div class="v" id="kSessions">—</div>
+      </div>
+      <div class="stat">
+        <div class="l">Pageviews (24h)</div>
+        <div class="v" id="kPV24">—</div>
+      </div>
+      <div class="stat">
+        <div class="l">Unique Pages</div>
+        <div class="v" id="kPages">—</div>
+      </div>
+      <div class="stat">
+        <div class="l">Errors (24h)</div>
+        <div class="v" id="kErr24">—</div>
+      </div>
+      <div class="stat">
+        <div class="l">Median Load (ms)</div>
+        <div class="v" id="kP50">—</div>
+      </div>
+    </section>
+
+    <!-- Charts -->
+    <section class="charts">
+      <article class="chart">
+        <h2>Errors per Minute</h2>
+        <div id="chartErrors" class="zc" aria-label="Errors per minute"></div>
+      </article>
+
+      <article class="chart">
+        <h2>Median Load by Page (Top 5)</h2>
+        <div id="chartPages" class="zc" aria-label="Median load by page"></div>
+      </article>
+
+      <article class="chart">
+        <h2>Session Duration Distribution (last 24h)</h2>
+        <div
+          id="chartSessDur"
+          class="zc"
+          aria-label="Histogram of session durations"
+        ></div>
+      </article>
+
+      <article class="chart">
+        <h2>Top Landing Pages (All-Time)</h2>
+        <div id="chartLanding" class="zc" aria-label="Top landing pages"></div>
+      </article>
+
+      <article class="chart">
+        <h2>Top Exit Pages (All-Time)</h2>
+        <div id="chartExit" class="zc" aria-label="Top exit pages"></div>
+      </article>
+
+      <article class="chart">
+        <h2>Traffic Share by Page (All-Time)</h2>
+        <div
+          id="chartTrafficShare"
+          class="zc"
+          aria-label="Traffic share by page"
+        ></div>
+      </article>
+    </section>
+
+    <!-- Error Grid -->
+    <section class="grid">
+      <h2 style="font-size: 14px; margin: 10px 0 6px">Recent Errors</h2>
+      <table id="errTable">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Path</th>
+            <th>Message</th>
+            <th>Source</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- Logic-->
+    <script defer>
+      // helpers
+      async function j(url) {
+        const r = await fetch(url, { credentials: "include" });
+        const t = await r.text();
+        if (!r.ok)
+          throw new Error(url + " -> " + r.status + "\n" + t.slice(0, 200));
+        try {
+          return JSON.parse(t);
+        } catch {
+          throw new Error(url + " non-JSON:\n" + t.slice(0, 200));
+        }
+      }
+      const arr = (x) =>
+        Array.isArray(x)
+          ? x
+          : x && Array.isArray(x.data)
+          ? x.data
+          : x && Array.isArray(x.rows)
+          ? x.rows
+          : x && Array.isArray(x.result)
+          ? x.result
+          : [];
+      const pctl = (s, p) => {
+        if (!s.length) return 0;
+        const a = [...s].sort((x, y) => x - y);
+        const i = (p / 100) * (a.length - 1),
+          lo = Math.floor(i),
+          hi = Math.ceil(i);
+        return lo === hi
+          ? a[lo]
+          : Math.round(a[lo] * (1 - (i - lo)) + a[hi] * (i - lo));
+      };
+      const minBucket = (ms) => {
+        const d = new Date(Number(ms || Date.now()));
+        d.setSeconds(0, 0);
+        return d.getTime();
+      };
+
+      function addErrRows(rows) {
+        const tb = document.querySelector("#errTable tbody");
+        if (!tb) return;
+        tb.innerHTML = "";
+        for (const r of rows.slice(0, 50)) {
+          const when = new Date(
+            Number(r.ts || r.timestamp || Date.now())
+          ).toLocaleString();
+          let path = r.path || "";
+          if (!path && r.page_url) {
+            try {
+              path = new URL(r.page_url).pathname;
+            } catch {}
+          }
+          const msg = (r.error && (r.error.message || "")) || "";
+          const src = (r.error && (r.error.source || "")) || "";
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${when}</td><td>${path}</td><td>${msg}</td><td>${src}</td>`;
+          tb.appendChild(tr);
+        }
+      }
+
+      // loader
+      (async function loadAll() {
+        try {
+          const [statRaw, perfRaw, actRaw] = await Promise.all([
+            j("/api/static?limit=8000"),
+            j("/api/performance?limit=8000"),
+            j("/api/activity?limit=8000"),
+          ]);
+          const stat = arr(statRaw),
+            perf = arr(perfRaw),
+            act = arr(actRaw);
+
+          // Stats
+          const sessions = new Set(
+            stat.map((r) => r.session_id || r.sessionId).filter(Boolean)
+          ).size;
+          const pages = new Set(
+            stat
+              .map((r) => {
+                let p = r.path || "";
+                if (!p && r.page_url) {
+                  try {
+                    p = new URL(r.page_url).pathname;
+                  } catch {}
+                }
+                return p;
+              })
+              .filter(Boolean)
+          ).size;
+          const dayAgo = Date.now() - 24 * 3600 * 1000;
+          const pv24 = stat.filter(
+            (r) => Number(r.ts || r.timestamp || 0) >= dayAgo
+          ).length;
+          const errors24 = act.filter(
+            (r) =>
+              String(r.type || "").toLowerCase() === "error" &&
+              Number(r.ts || 0) >= dayAgo
+          ).length;
+
+          const totals = perf
+            .map((r) => {
+              const t =
+                r.total_ms ??
+                r.totalMs ??
+                (r.load_end != null && r.nav_start != null
+                  ? Number(r.load_end) - Number(r.nav_start)
+                  : null);
+              return t != null ? Number(t) : null;
+            })
+            .filter((v) => v != null);
+          const med = pctl(totals, 50);
+
+          document.getElementById("kSessions").textContent = String(sessions);
+          document.getElementById("kPV24").textContent = String(pv24);
+          document.getElementById("kPages").textContent = String(pages);
+          document.getElementById("kErr24").textContent = String(errors24);
+          document.getElementById("kP50").textContent = String(med || 0);
+
+          // Errors per minute
+          const errRows = act.filter(
+            (r) => String(r.type || "").toLowerCase() === "error"
+          );
+          const byMin = new Map();
+          for (const r of errRows) {
+            const m = minBucket(r.ts || r.timestamp || Date.now());
+            byMin.set(m, (byMin.get(m) || 0) + 1);
+          }
+          const mins = [...byMin.keys()].sort((a, b) => a - b);
+          renderErrors(
+            mins.map((t) => new Date(t).toLocaleTimeString()),
+            mins.map((m) => byMin.get(m))
+          );
+
+          // Median load by page (top 5)
+          const perPage = new Map();
+          for (const r of perf) {
+            let path = r.path || "";
+            if (!path && r.page_url) {
+              try {
+                path = new URL(r.page_url).pathname;
+              } catch {}
+            }
+            const t =
+              r.total_ms ??
+              r.totalMs ??
+              (r.load_end != null && r.nav_start != null
+                ? Number(r.load_end) - Number(r.nav_start)
+                : null);
+            if (path && t != null) {
+              const a = perPage.get(path) || [];
+              a.push(Number(t));
+              perPage.set(path, a);
+            }
+          }
+          const medRows = [...perPage.entries()].map(([p, a]) => [
+            p,
+            pctl(a, 50),
+          ]);
+          const top = medRows.sort((a, b) => b[1] - a[1]).slice(0, 5);
+          renderPages(
+            top.map(([p]) => p),
+            top.map(([, m]) => m)
+          );
+
+          // Session duration (last 24h)
+          const stat24 = stat.filter(
+            (r) => Number(r.ts || r.timestamp || 0) >= dayAgo
+          );
+          const spans = new Map(); // sid -> {min, max}
+          for (const r of stat24) {
+            const sid = r.session_id || r.sessionId;
+            const ts = Number(r.ts || r.timestamp || 0);
+            if (!sid || !ts) continue;
+            const s = spans.get(sid) || { min: ts, max: ts };
+            if (ts < s.min) s.min = ts;
+            if (ts > s.max) s.max = ts;
+            spans.set(sid, s);
+          }
+          const durations = [...spans.values()].map((s) =>
+            Math.max(0, (s.max - s.min) / 1000)
+          );
+          const edges = [0, 10, 30, 60, 180, 300, 600, 1200, Infinity];
+          const labels = [
+            "0–10s",
+            "10–30s",
+            "30–60s",
+            "1–3m",
+            "3–5m",
+            "5–10m",
+            "10–20m",
+            "20m+",
+          ];
+          const counts = new Array(labels.length).fill(0);
+          for (const d of durations) {
+            let i = 0;
+            while (i < edges.length - 1 && !(d >= edges[i] && d < edges[i + 1]))
+              i++;
+            counts[i] += 1;
+          }
+          renderSessDur(labels, counts);
+
+          // Landing
+          const firstBySession = new Map();
+          for (const r of stat) {
+            const sid = r.session_id || r.sessionId;
+            if (!sid) continue;
+            const ts = Number(r.ts || r.timestamp || 0);
+            if (!ts) continue;
+            let path = r.path || "";
+            if (!path && r.page_url) {
+              try {
+                path = new URL(r.page_url).pathname;
+              } catch {}
+            }
+            if (!path) continue;
+            const cur = firstBySession.get(sid);
+            if (!cur || ts < cur.ts) firstBySession.set(sid, { ts, path });
+          }
+          const landingCounts = new Map();
+          for (const { path } of firstBySession.values()) {
+            landingCounts.set(path, (landingCounts.get(path) || 0) + 1);
+          }
+          const topLandings = [...landingCounts.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5);
+          renderLanding(
+            topLandings.map(([p]) => p),
+            topLandings.map(([, n]) => n)
+          );
+
+          // Exit
+          const lastBySession = new Map();
+          function considerForExit(row) {
+            const sid = row.session_id || row.sessionId;
+            if (!sid) return;
+            const ts = Number(row.ts || row.timestamp || 0);
+            if (!ts) return;
+            let path = row.path || "";
+            if (!path) {
+              const pu = row.page_url || row.pageUrl || "";
+              if (pu) {
+                try {
+                  path = new URL(pu).pathname;
+                } catch {}
+              }
+            }
+            if (!path) return;
+            const isLeave = String(row.type || "").toLowerCase() === "leave";
+            const cur = lastBySession.get(sid);
+            if (
+              !cur ||
+              ts > cur.ts ||
+              (ts === cur.ts && isLeave && !cur.isLeave)
+            ) {
+              lastBySession.set(sid, { ts, path, isLeave });
+            }
+          }
+          for (const r of stat) considerForExit(r);
+          for (const r of act) considerForExit(r);
+          const exitCounts = new Map();
+          for (const { path } of lastBySession.values()) {
+            exitCounts.set(path, (exitCounts.get(path) || 0) + 1);
+          }
+          const topExits = [...exitCounts.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5);
+          renderExit(
+            topExits.map(([p]) => p),
+            topExits.map(([, n]) => n)
+          );
+
+          // Traffic share
+          const pvByPath = new Map();
+          for (const r of stat) {
+            let p = r.path || "";
+            if (!p && r.page_url) {
+              try {
+                p = new URL(r.page_url).pathname;
+              } catch {}
+            }
+            if (!p) continue;
+            pvByPath.set(p, (pvByPath.get(p) || 0) + 1);
+          }
+          const sorted = [...pvByPath.entries()].sort((a, b) => b[1] - a[1]);
+          const totalPV = sorted.reduce((s, [, n]) => s + n, 0) || 1;
+
+          const MIN_PCT = 3; // fold anything below 3% into “Other”
+          const MAX_SLICES = 7;
+          const kept = [];
+          let other = 0;
+          for (const [path, n] of sorted) {
+            const pct = (100 * n) / totalPV;
+            if (kept.length < MAX_SLICES && pct >= MIN_PCT)
+              kept.push([path, n]);
+            else other += n;
+          }
+          if (other) kept.push(["Other", other]);
+          renderTrafficShare(
+            kept.map(([p]) => p),
+            kept.map(([, n]) => n)
+          );
+
+          // table
+          addErrRows(errRows.sort((a, b) => (b.ts || 0) - (a.ts || 0)));
+        } catch (e) {
+          console.error(e);
+        }
+      })();
+    </script>
+  </body>
 </html>

@@ -24,7 +24,7 @@ password: frogfrog
 https://404turtle.site/
 
 # Dashboard
-We built the dashboard around two simple goals: see what users do and see if the site feels healthy/fast while they do it. The page has a quick stats bar on top and the charts underneath.
+We built the dashboard around two goals: what users are doing on our site/using our site for and whether the site feels healthy and fast while they do it. The page has a quick stats bar on top and the charts underneath.
 
 ## Stats bar
 Up top we show Sessions, Pageviews (24h), Unique Pages, Errors (24h), and Median Load (ms). They’re kept as numbers on purpose to be easy to glance at. The 24-hour window keeps the activity numbers fresh, and using the median for load keeps weird outliers from messing it up.

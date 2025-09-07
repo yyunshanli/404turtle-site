@@ -41,7 +41,7 @@ For performance, we look at the “typical” load time for each page and show j
 
 ## Session Duration Distribution (last 24h) — horizontal bars
 
-This one groups sessions by how long they lasted in simple ranges: 0–10s, 10–30s, 30–60s, 1–3m, and so on. Ranges are easier to understand than exact seconds, and the horizontal layout keeps the labels readable. While the report is not perfect, as people leave tabs open and sessions can include a few visits, it’s great for seeing if most people bounce right away or actually hang around.
+This one groups sessions by how long they lasted in simple ranges: 0-10s, 10-30s, 30-60s, 1–3m, and so on. Ranges are easier to understand than exact seconds, and the horizontal layout keeps the labels readable. While the report is not perfect, as people leave tabs open and sessions can include a few visits, it’s great for seeing if most people bounce right away or actually hang around.
 
 ## Top Landing Pages (all-time) — bar chart
 

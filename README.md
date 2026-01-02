@@ -21,7 +21,7 @@ user: grader
 password: frogfrog
 
 # link to site
-https://404turtle.site/
+https://404turtle.site/ (deactivated from DNS provider)
 
 # Dashboard
 We built the dashboard around two goals: what users are doing on our site/using our site for and whether the site feels healthy and fast while they do it. The page has a quick stats bar on top and the charts underneath.
